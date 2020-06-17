@@ -1,8 +1,9 @@
+use glob::{glob_with, MatchOptions};
 use serde::Deserialize;
-use std::ffi::OsStr;
 use std::fs;
 use std::io;
 use std::{
+    ffi::OsStr,
     fs::DirEntry,
     path::{Path, PathBuf},
 };
@@ -16,6 +17,8 @@ pub enum JunitError {
     IoErr(#[from] std::io::Error),
     #[error("Internal error: {0}")]
     InternalError(String),
+    #[error("Invalid report dir pattern")]
+    InvalidReportDirPattern(#[from] glob::PatternError),
 }
 
 pub type Result<T> = std::result::Result<T, JunitError>;
@@ -93,27 +96,27 @@ impl TestCase {
 
 #[derive(Debug, PartialEq)]
 pub struct FailedTestCase {
-    name: String,
-    classname: String,
-    time: f32,
-    failure: TestFailure,
+    pub name: String,
+    pub classname: String,
+    pub time: f32,
+    pub failure: TestFailure,
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TestFailure {
-    message: String,
+    pub message: String,
     #[serde(rename = "type")]
-    classname: String,
+    pub classname: String,
     #[serde(rename = "$value")]
-    stack_trace: String,
+    pub stack_trace: String,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct FailedTestSuite {
-    name: String,
-    time: f32,
+    pub name: String,
+    pub time: f32,
     timestamp: String,
-    failed_testcases: Vec<FailedTestCase>,
+    pub failed_testcases: Vec<FailedTestCase>,
 }
 
 fn read_failed_testsuite<R: io::Read>(mut input: R) -> Result<Option<FailedTestSuite>> {
@@ -129,46 +132,38 @@ fn read_failed_testsuite<R: io::Read>(mut input: R) -> Result<Option<FailedTestS
     }
 }
 
-//Taken from https://doc.rust-lang.org/std/fs/fn.read_dir.html
-fn visit_dirs(
-    dir: &Path,
-    cb: &mut dyn FnMut(&DirEntry, Option<&Path>) -> io::Result<()>,
-) -> io::Result<()> {
-    if dir.is_dir() {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                visit_dirs(&path, cb)?;
-            } else {
-                cb(&entry, Some(dir))?;
-            }
-        }
-    }
-    Ok(())
-}
-
 pub struct FailedTestSuiteVisitor {
     report_files: Vec<PathBuf>,
     position: usize,
 }
 
 impl FailedTestSuiteVisitor {
-    pub fn from_basedir<P: AsRef<Path>>(dir: P, junit_report_dir: &str) -> Result<Self> {
+    pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
         let mut report_files: Vec<PathBuf> = Vec::new();
-        let mut append_dir_reports = |file: &DirEntry, parent_dir: Option<&Path>| {
-            if parent_dir.map_or_else(
-                || false,
-                |d| d.file_name().and_then(|n| n.to_str()) == Some(junit_report_dir),
-            ) {
-                if file.path().extension() == Some(OsStr::new("xml")) {
-                    report_files.push(file.path());
+        let prefixed_dir_pattern =
+            vec![base_dir.as_ref().to_str().unwrap(), report_dir_pattern].join("/");
+        println!("prefixed glob: {}", prefixed_dir_pattern);
+        let paths = glob_with(
+            &prefixed_dir_pattern,
+            MatchOptions {
+                case_sensitive: true,
+                require_literal_separator: true,
+                require_literal_leading_dot: true,
+            },
+        )?;
+        for path in paths {
+            if let Ok(path) = path {
+                if path.is_dir() {
+                    for entry in fs::read_dir(path)? {
+                        if let Ok(file) = entry {
+                            if file.path().extension() == Some(OsStr::new("xml")) {
+                                report_files.push(file.path());
+                            }
+                        }
+                    }
                 }
             }
-            Ok(())
-        };
-
-        visit_dirs(dir.as_ref(), &mut append_dir_reports)?;
+        }
 
         Ok(FailedTestSuiteVisitor {
             report_files: report_files,
@@ -294,16 +289,16 @@ com.example
     }
     #[test]
     fn failed_testsuite_visitor() {
-        let report_dirname = "testreports";
+        let report_dir_pattern = "**/testreports";
         let mut dir = env::temp_dir();
         let mut failed_suites: Vec<FailedTestSuite> = Vec::new();
 
         dir.push(format!("cinotify/testrun-{}", Uuid::new_v4()));
         let base_dir = dir.as_path();
 
-        create_report_dir(base_dir, report_dirname, 3, 3, 7).expect("Couldn't setup test data");
+        create_report_dir(base_dir, "testreports", 3, 3, 7).expect("Couldn't setup test data");
 
-        let visitor = FailedTestSuiteVisitor::from_basedir(base_dir, report_dirname)
+        let visitor = FailedTestSuiteVisitor::from_basedir(base_dir, report_dir_pattern)
             .expect("Couldn't initialize visitor");
 
         for failed_suite in visitor {

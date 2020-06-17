@@ -19,7 +19,7 @@ pub enum Notifications {
 
 #[derive(PartialEq, Debug, Deserialize)]
 pub struct Junit {
-    pub report_dir: String,
+    pub report_dir_pattern: String,
 }
 
 #[derive(PartialEq, Debug, Deserialize)]
@@ -37,7 +37,7 @@ impl Config {
 }
 
 mod tests {
-    use crate::config::*;
+    use super::*;
 
     #[test]
     fn parse_from_toml() {
@@ -52,7 +52,7 @@ mod tests {
         user_2 = "usertwo"
 
         [junit]
-        report_dir = "test-reports"
+        report_dir_pattern = "**/target/**/test-reports"
     "#,
         )
         .unwrap();
@@ -74,7 +74,7 @@ mod tests {
                     user_handles: handles
                 },
                 junit: Junit {
-                    report_dir: "test-reports".to_owned()
+                    report_dir_pattern: "**/target/**/test-reports".to_owned()
                 }
             }
         )
