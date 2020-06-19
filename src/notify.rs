@@ -1,4 +1,4 @@
-use crate::junit::FailedTestSuite;
+use crate::junit::{FailedTestSuite, TestSuite};
 use anyhow::Result;
 use std::io;
 
@@ -12,32 +12,35 @@ pub trait Notifier {
     fn notify(&mut self, ctx: CIContext, event: &Self::Event) -> Result<()>;
 }
 
-pub struct ConsoleFailureNotifier {
+pub struct ConsoleNotifier {
     sink: Box<dyn io::Write>,
 }
-impl ConsoleFailureNotifier {
+impl ConsoleNotifier {
     fn sink_to(sink: Box<dyn io::Write>) -> Self {
-        ConsoleFailureNotifier { sink }
+        ConsoleNotifier { sink }
     }
 
     pub fn stdout() -> Self {
-        ConsoleFailureNotifier::sink_to(Box::new(io::stdout()))
+        ConsoleNotifier::sink_to(Box::new(io::stdout()))
     }
 }
-impl Notifier for ConsoleFailureNotifier {
-    type Event = Vec<FailedTestSuite>;
+impl Notifier for ConsoleNotifier {
+    type Event = Vec<TestSuite>;
     fn notify(&mut self, _ctx: CIContext, failed_suites: &Self::Event) -> Result<()> {
         for suite in failed_suites {
             write!(
                 self.sink,
-                "Failed test suite: {}, duration: ({})",
+                "Test suite: {}, duration: ({}) \n",
                 &suite.name, &suite.time
             )?;
-            for testcase in &suite.failed_testcases {
+            for testcase in &suite.testcases {
                 write!(
                     self.sink,
-                    "- {} /[{}]({}) : {}",
-                    &testcase.name, &testcase.classname, &testcase.time, &testcase.failure.message
+                    "- {} /[{}]({}) - success: {}\n",
+                    &testcase.name,
+                    &testcase.classname,
+                    &testcase.time,
+                    &testcase.is_successful()
                 )?
             }
         }

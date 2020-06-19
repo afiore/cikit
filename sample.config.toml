@@ -7,4 +7,4 @@ user_1 = "userone"
 user_2 = "usertwo"
 
 [junit]
-report_dir_pattern = "**/target/test-reports/*.xml"
+report_dir_pattern = "**/target/test-reports"

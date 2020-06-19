@@ -1,8 +1,8 @@
 use cinotify::config::Config;
 use cinotify::junit;
 use cinotify::junit::FailedTestSuiteVisitor;
-use cinotify::notify::{CIContext, ConsoleFailureNotifier, Notifier};
-use junit::FailedTestSuite;
+use cinotify::notify::{CIContext, ConsoleNotifier, Notifier};
+use junit::{FailedTestSuite, TestSuiteVisitor};
 use std::{env, path::PathBuf};
 use structopt::StructOpt;
 
@@ -25,6 +25,7 @@ struct Opt {
 }
 
 fn main() -> junit::Result<()> {
+    env_logger::init();
     let opt = Opt::from_args();
     let cmd = opt.cmd;
     let config = Config::from_file(opt.config_path)?;
@@ -32,19 +33,17 @@ fn main() -> junit::Result<()> {
         Cmd::Failures { project_dir } => {
             let current_dir = env::current_dir()?;
             let project_dir = project_dir.unwrap_or_else(|| current_dir);
-            let failed_testsuite_visitor = FailedTestSuiteVisitor::from_basedir(
-                project_dir,
-                &config.junit.report_dir_pattern,
-            )?;
+            let test_suites =
+                TestSuiteVisitor::from_basedir(project_dir, &config.junit.report_dir_pattern)?
+                    .collect();
 
-            let failed_suites: Vec<FailedTestSuite> = failed_testsuite_visitor.collect();
-            let mut console_notifier = ConsoleFailureNotifier::stdout();
+            let mut console_notifier = ConsoleNotifier::stdout();
             let ctx = CIContext {
                 commit_author: "andrea".to_owned(),
                 build_id: "xyz".to_owned(),
             };
             console_notifier
-                .notify(ctx, &failed_suites)
+                .notify(ctx, &test_suites)
                 .expect("Failed to write to console");
         }
     }

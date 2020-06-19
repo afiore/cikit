@@ -1,13 +1,13 @@
 use glob::{glob_with, MatchOptions};
-use serde::Deserialize;
+use serde::{Deserializer, Deserialize};
 use std::fs;
 use std::io;
 use std::{
     ffi::OsStr,
-    fs::DirEntry,
     path::{Path, PathBuf},
 };
 use thiserror::Error;
+use chrono::{NaiveDateTime, Duration};
 
 #[derive(Error, Debug)]
 pub enum JunitError {
@@ -23,29 +23,37 @@ pub enum JunitError {
 
 pub type Result<T> = std::result::Result<T, JunitError>;
 
-#[derive(Debug, PartialEq, Deserialize)]
-struct TestSuiteSummary {
-    name: String,
-    errors: u16,
-    failures: u16,
+// fn f32_to_duration(secs: f32) -> Duration {
+    // Duration::from_std(std::time::Duration::from_secs_f32(secs)
+// }
+
+fn f32_to_duration<'de, D>(deserializer: D) -> std::result::Result<Duration, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+    let secs = f32::deserialize(deserializer)?;
+    Duration::from_std(std::time::Duration::from_secs_f32(secs)).map_err(|_| Error::custom("Cannot parse duration"))
 }
 
-impl TestSuiteSummary {
-    fn is_successful(&self) -> bool {
-        self.errors == 0 && self.failures == 0
-    }
-}
-
 #[derive(Debug, PartialEq, Deserialize)]
-struct TestSuite {
-    name: String,
-    time: f32,
-    timestamp: String,
+pub struct TestSuite {
+    pub name: String,
+    pub tests: u16,
+    pub errors: u16,
+    pub failures: u16,
+    pub skipped: u16,
+    #[serde(deserialize_with = "f32_to_duration")]
+    pub time: Duration,
+    pub timestamp: NaiveDateTime,
     #[serde(rename = "testcase", default)]
-    testcases: Vec<TestCase>,
+    pub testcases: Vec<TestCase>,
 }
 
 impl TestSuite {
+    fn is_successful(&self) -> bool {
+        self.failures == 0 && self.errors == 0
+    }
     fn as_failed(self) -> Result<FailedTestSuite> {
         let mut failed_testcases: Vec<FailedTestCase> = Vec::new();
         for t in self.testcases {
@@ -53,7 +61,6 @@ impl TestSuite {
                 failed_testcases.push(t.as_failed()?);
             }
         }
-
         Ok(FailedTestSuite {
             name: self.name,
             time: self.time,
@@ -64,15 +71,16 @@ impl TestSuite {
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
-struct TestCase {
-    name: String,
-    classname: String,
-    time: f32,
+pub struct TestCase {
+    pub name: String,
+    pub classname: String,
+    pub time: f32,
     failure: Option<TestFailure>,
+    skipped: Option<TestSkipped>,
 }
 impl TestCase {
-    fn is_successful(&self) -> bool {
-        self.failure.is_none()
+    pub fn is_successful(&self) -> bool {
+        self.failure.is_none() && self.skipped.is_none()
     }
 }
 
@@ -101,6 +109,15 @@ pub struct FailedTestCase {
     pub time: f32,
     pub failure: TestFailure,
 }
+#[derive(Debug, PartialEq, Deserialize)]
+pub struct TestSkipped{}
+
+impl From<TestSkipped> for bool {
+    fn from(_: TestSkipped) -> Self {
+        true
+    }
+}
+
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TestFailure {
@@ -114,35 +131,26 @@ pub struct TestFailure {
 #[derive(Debug, PartialEq)]
 pub struct FailedTestSuite {
     pub name: String,
-    pub time: f32,
-    timestamp: String,
+    pub time: Duration,
+    pub timestamp: NaiveDateTime,
     pub failed_testcases: Vec<FailedTestCase>,
 }
 
-fn read_failed_testsuite<R: io::Read>(mut input: R) -> Result<Option<FailedTestSuite>> {
-    let mut body = String::new();
-    input.read_to_string(&mut body)?;
-    let summary: TestSuiteSummary = serde_xml_rs::from_str(&body)?;
-    if summary.is_successful() {
-        Ok(None)
-    } else {
-        let testsuite: TestSuite = serde_xml_rs::from_str(&body)?;
-        let failed_testsuite = testsuite.as_failed()?;
-        Ok(Some(failed_testsuite))
-    }
+fn read_suite<R: io::Read>(input: R) -> Result<TestSuite> {
+    let suite: TestSuite  = serde_xml_rs::from_reader(input)?;
+    Ok(suite)
 }
 
-pub struct FailedTestSuiteVisitor {
+pub struct ReportVisitor {
     report_files: Vec<PathBuf>,
     position: usize,
 }
 
-impl FailedTestSuiteVisitor {
+impl ReportVisitor {
     pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
         let mut report_files: Vec<PathBuf> = Vec::new();
         let prefixed_dir_pattern =
             vec![base_dir.as_ref().to_str().unwrap(), report_dir_pattern].join("/");
-        println!("prefixed glob: {}", prefixed_dir_pattern);
         let paths = glob_with(
             &prefixed_dir_pattern,
             MatchOptions {
@@ -165,10 +173,57 @@ impl FailedTestSuiteVisitor {
             }
         }
 
-        Ok(FailedTestSuiteVisitor {
-            report_files: report_files,
+        Ok(ReportVisitor {
+            report_files,
             position: 0,
         })
+    }
+}
+impl Iterator for ReportVisitor {
+    type Item = PathBuf;
+    fn next(&mut self) -> Option<Self::Item> {
+      if self.position >= self.report_files.len() {
+          None
+      } else {
+          let item = self.report_files[self.position].to_owned();
+          self.position += 1;
+          Some(item)
+      }
+    }
+}
+
+
+pub struct TestSuiteVisitor {
+    visitor: ReportVisitor
+}
+
+impl TestSuiteVisitor {
+    pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
+        let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
+        Ok(TestSuiteVisitor { visitor })
+    }
+}
+impl Iterator for TestSuiteVisitor {
+    type Item = TestSuite;
+    fn next(&mut self) -> Option<Self::Item> {
+        let path = self.visitor.next()?;
+        let display_path = path.display();
+        let file = fs::File::open(path.clone()).expect(&format!("Couldn't open report file: {}", display_path));
+        let suite =  read_suite(file).expect(&format!("Couldn't parse junit TestSuite from XML report {}", display_path));
+        Some(suite)
+    }
+}
+
+
+
+pub struct FailedTestSuiteVisitor {
+    visitor: TestSuiteVisitor
+}
+
+impl FailedTestSuiteVisitor {
+    pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
+        let visitor = TestSuiteVisitor::from_basedir(base_dir, report_dir_pattern)?;
+        Ok(FailedTestSuiteVisitor { visitor })
     }
 }
 
@@ -177,24 +232,18 @@ impl Iterator for FailedTestSuiteVisitor {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if self.position >= self.report_files.len() {
-                break;
-            } else {
-                let test_report = &self.report_files[self.position].to_owned();
-                let file = fs::File::open(test_report).expect(&format!(
-                    "expected test report {} to be readable",
-                    test_report.display()
-                ));
-                self.position += 1;
-                if let Some(failed_testsuite) = read_failed_testsuite(file).expect(&format!(
-                    "failed to parse testsuite: {}",
-                    test_report.display()
-                )) {
-                    return Some(failed_testsuite);
-                }
+            match self.visitor.next() {
+                 Some(suite) if suite.is_successful() => {
+                     continue;
+                 },
+                 Some(suite) => {
+                     return Some(suite.as_failed().unwrap())
+                 },
+                 _ => {
+                     return None
+                 }
             }
         }
-        None
     }
 }
 
@@ -206,19 +255,25 @@ mod tests {
 
     use super::*;
     use serde_xml_rs::from_reader;
+    use pretty_assertions::assert_eq;
     use std::env;
     use uuid::Uuid;
+    use chrono::NaiveDate;
 
     const SUCCESS_TESTSUITE_XML: &str = r##"
-<testsuite hostname="lenstop" name="com.example.LiveTopicCounterTest" tests="5" errors="0" failures="0" skipped="0" time="2.137" timestamp="2020-06-07T14:18:12">
+<testsuite hostname="lenstop" name="com.example.LiveTopicCounterTest" tests="1" errors="0" failures="0" skipped="0" time="2.137" timestamp="2020-06-07T14:18:12">
                      <properties></properties>
                      <testcase classname="com.example.LiveTopicCounterTest" name="LiveTopicCounter should raise an error when the supplied topic does not exist" time="0.079">
                      </testcase>
+                     <testcase classname="com.example.LiveTopicCounterTest" name="LiveTopicCounter should skip this test" time="0.001">
+                       <skipped/>
+                     </testcase>
+ 
          </testsuite>
          "##;
 
     const FAILED_TESTSUITE_XML: &str = r##"
-<testsuite hostname="lenstop" name="com.example.LiveTopicCounterTest" tests="5" errors="0" failures="1" skipped="0" time="2.137" timestamp="2020-06-07T14:18:12">
+<testsuite hostname="lenstop" name="com.example.LiveTopicCounterTest" tests="5" errors="0" failures="1" skipped="0" time="2.137" timestamp="2020-06-07T14:18:13">
                      <properties></properties>
                      <testcase classname="com.example.LiveTopicCounterTest" name="LiveTopicCounter should raise an error when the supplied topic does not exist" time="0.079">
                                                </testcase><testcase classname="com.example.LiveTopicCounterTest" name="TopicCounter should return a one element stream when called on an empty topic" time="0.466">
@@ -235,20 +290,48 @@ com.example
          </testsuite>
          "##;
 
+    fn read_failed_testsuite<R: io::Read>(input: R) -> Result<Option<FailedTestSuite>> {
+        let suite = read_suite(input)?;
+        if suite.is_successful() {
+            Ok(None)
+        } else {
+            let failed_testsuite = suite.as_failed()?;
+            Ok(Some(failed_testsuite))
+        }
+    }
+
     #[test]
-    fn can_parse_testsuite_summary() {
-        let s = r##"
-         <testsuite hostname="localhost" name="com.example.LiveTopicCounterTest" tests="5" errors="0" failures="1" skipped="0" time="2.137" timestamp="2020-06-07T14:18:12">
-           <properties>
-             <property name="jline.esc.timeout" value="0"/>
-           </properties>
-         </testsuite>
-         "##;
-        let summary: TestSuiteSummary = from_reader(s.as_bytes()).unwrap();
-        let expected = TestSuiteSummary {
+    fn parse_testsuite() {
+        let summary: TestSuite = from_reader(SUCCESS_TESTSUITE_XML.as_bytes()).unwrap();
+        let expected = TestSuite {
             name: "com.example.LiveTopicCounterTest".to_owned(),
+            tests: 1,
             errors: 0,
-            failures: 1,
+            failures: 0,
+            skipped: 0,
+            time: Duration::nanoseconds(137000064) + Duration::seconds(2),//2.137,
+            timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
+            testcases: vec![
+                TestCase {
+                name:
+                    "LiveTopicCounter should raise an error when the supplied topic does not exist"
+                        .to_owned(),
+                classname: "com.example.LiveTopicCounterTest".to_owned(),
+                time: 0.079,
+                failure: None,
+                skipped: None,
+            },
+                TestCase {
+                name:
+                        "LiveTopicCounter should skip this test".to_owned(),
+                classname: "com.example.LiveTopicCounterTest".to_owned(),
+                time: 0.001,
+                failure: None,
+                skipped: Some(TestSkipped{}),
+            },
+
+            
+            ],
         };
         assert_eq!(summary, expected);
     }
@@ -268,8 +351,8 @@ com.example
         };
         let expected = FailedTestSuite {
             name: "com.example.LiveTopicCounterTest".to_owned(),
-            time: 2.137,
-            timestamp: "2020-06-07T14:18:12".to_owned(),
+            time: Duration::nanoseconds(137000064) + Duration::seconds(2),//2.137,
+            timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 13),
             failed_testcases: vec![failed],
         };
         let failed = suite.as_failed().unwrap();
