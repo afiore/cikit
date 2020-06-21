@@ -42,7 +42,7 @@ pub struct TestSuite {
     pub tests: u16,
     pub errors: u16,
     pub failures: u16,
-    pub skipped: u16,
+    pub skipped: Option<u16>,
     #[serde(deserialize_with = "f32_to_duration")]
     pub time: Duration,
     pub timestamp: NaiveDateTime,
@@ -51,7 +51,10 @@ pub struct TestSuite {
 }
 
 impl TestSuite {
-    fn is_successful(&self) -> bool {
+    pub fn skipped(&self) -> u16 {
+        self.skipped.unwrap_or_default()
+    }
+    pub fn is_successful(&self) -> bool {
         self.failures == 0 && self.errors == 0
     }
     fn as_failed(self) -> Result<FailedTestSuite> {
@@ -75,10 +78,13 @@ pub struct TestCase {
     pub name: String,
     pub classname: String,
     pub time: f32,
-    failure: Option<TestFailure>,
+    pub failure: Option<TestFailure>,
     skipped: Option<TestSkipped>,
 }
 impl TestCase {
+    pub fn is_skipped(&self) -> bool {
+        self.skipped.is_some()
+    }
     pub fn is_successful(&self) -> bool {
         self.failure.is_none() && self.skipped.is_none()
     }
@@ -112,12 +118,41 @@ pub struct FailedTestCase {
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TestSkipped{}
 
-impl From<TestSkipped> for bool {
-    fn from(_: TestSkipped) -> Self {
-        true
-    }
+pub struct Summary {
+    pub total_time: Duration,
+    pub tests: u16,
+    pub failures: u16,
+    pub errors: u16,
+    pub skipped: u16,
 }
 
+impl Summary {
+    fn is_successful(&self) -> bool {
+        self.failures == 0 && self.errors == 0
+    }
+    pub fn from_suites(suites: &Vec<TestSuite>) -> Self {
+        let mut total_time = Duration::zero();
+        let mut tests = 0;
+        let mut failures = 0;
+        let mut errors = 0;
+        let mut skipped = 0;
+        for suite in suites {
+            total_time = total_time + suite.time;
+            tests += suite.tests;
+            failures += suite.failures;
+            errors += suite.errors;
+            skipped += suite.skipped();
+
+        }
+        Summary {
+            total_time,
+            tests,
+            failures,
+            errors,
+            skipped
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TestFailure {
@@ -308,7 +343,7 @@ com.example
             tests: 1,
             errors: 0,
             failures: 0,
-            skipped: 0,
+            skipped: Some(0),
             time: Duration::nanoseconds(137000064) + Duration::seconds(2),//2.137,
             timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
             testcases: vec![

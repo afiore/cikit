@@ -1,4 +1,5 @@
-use crate::junit::{FailedTestSuite, TestSuite};
+use crate::console::ConsoleDisplay;
+use crate::junit::{Summary, TestSuite};
 use anyhow::Result;
 use std::io;
 
@@ -9,7 +10,7 @@ pub struct CIContext {
 
 pub trait Notifier {
     type Event;
-    fn notify(&mut self, ctx: CIContext, event: &Self::Event) -> Result<()>;
+    fn notify(&mut self, ctx: CIContext, event: Self::Event) -> Result<()>;
 }
 
 pub struct ConsoleNotifier {
@@ -25,24 +26,11 @@ impl ConsoleNotifier {
     }
 }
 impl Notifier for ConsoleNotifier {
-    type Event = Vec<TestSuite>;
-    fn notify(&mut self, _ctx: CIContext, failed_suites: &Self::Event) -> Result<()> {
-        for suite in failed_suites {
-            write!(
-                self.sink,
-                "Test suite: {}, duration: ({}) \n",
-                &suite.name, &suite.time
-            )?;
-            for testcase in &suite.testcases {
-                write!(
-                    self.sink,
-                    "- {} /[{}]({}) - success: {}\n",
-                    &testcase.name,
-                    &testcase.classname,
-                    &testcase.time,
-                    &testcase.is_successful()
-                )?
-            }
+    type Event = (Summary, Vec<TestSuite>);
+    fn notify(&mut self, _ctx: CIContext, event: Self::Event) -> Result<()> {
+        event.0.display(&mut self.sink, true, 0)?;
+        for suite in &event.1 {
+            suite.display(&mut self.sink, true, 0)?;
         }
         Ok(())
     }
