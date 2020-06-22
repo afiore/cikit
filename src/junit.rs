@@ -23,10 +23,6 @@ pub enum JunitError {
 
 pub type Result<T> = std::result::Result<T, JunitError>;
 
-// fn f32_to_duration(secs: f32) -> Duration {
-    // Duration::from_std(std::time::Duration::from_secs_f32(secs)
-// }
-
 fn f32_to_duration<'de, D>(deserializer: D) -> std::result::Result<Duration, D::Error>
 where
     D: Deserializer<'de>,
@@ -411,7 +407,7 @@ com.example
         let mut dir = env::temp_dir();
         let mut failed_suites: Vec<FailedTestSuite> = Vec::new();
 
-        dir.push(format!("cinotify/testrun-{}", Uuid::new_v4()));
+        dir.push(format!("cikit/testrun-{}", Uuid::new_v4()));
         let base_dir = dir.as_path();
 
         create_report_dir(base_dir, "testreports", 3, 3, 7).expect("Couldn't setup test data");

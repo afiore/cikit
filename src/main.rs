@@ -1,7 +1,7 @@
-use cinotify::config::Config;
-use cinotify::junit;
+use cikit::config::Config;
+use cikit::junit;
+use cikit::{console::ConsoleNotifier, notify::Notifier};
 
-use cinotify::notify::{CIContext, ConsoleNotifier, Notifier};
 use junit::{TestSuite, TestSuiteVisitor};
 use std::{env, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
@@ -94,12 +94,8 @@ fn main() -> junit::Result<()> {
 
             let summary = junit::Summary::from_suites(&test_suites);
             let mut console_notifier = ConsoleNotifier::stdout();
-            let ctx = CIContext {
-                commit_author: "andrea".to_owned(),
-                build_id: "xyz".to_owned(),
-            };
             console_notifier
-                .notify(ctx, (summary, test_suites))
+                .notify((summary, test_suites), ())
                 .expect("Failed to write to console");
         }
     }

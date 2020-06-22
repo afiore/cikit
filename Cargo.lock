@@ -72,7 +72,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cinotify"
+name = "cikit"
 version = "0.1.0"
 dependencies = [
  "anyhow",

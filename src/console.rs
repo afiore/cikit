@@ -2,7 +2,7 @@ use humantime::format_duration;
 use io::Result;
 use std::{io, time::Duration};
 
-use crate::junit::*;
+use crate::{junit::*, notify::Notifier};
 
 const INDENT_STR: &str = " ";
 
@@ -80,4 +80,28 @@ fn display_duration(d: Duration) -> String {
         .map(|s| s.to_string())
         .collect::<Vec<String>>()
         .join(" ")
+}
+
+pub struct ConsoleNotifier {
+    sink: Box<dyn io::Write>,
+}
+impl ConsoleNotifier {
+    fn sink_to(sink: Box<dyn io::Write>) -> Self {
+        ConsoleNotifier { sink }
+    }
+
+    pub fn stdout() -> Self {
+        ConsoleNotifier::sink_to(Box::new(io::stdout()))
+    }
+}
+impl Notifier for ConsoleNotifier {
+    type Event = (Summary, Vec<TestSuite>);
+    type CIContext = ();
+    fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
+        event.0.display(&mut self.sink, true, 0)?;
+        for suite in &event.1 {
+            suite.display(&mut self.sink, true, 0)?;
+        }
+        Ok(())
+    }
 }
