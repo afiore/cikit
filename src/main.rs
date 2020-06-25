@@ -1,8 +1,10 @@
 use cikit::config::Config;
 use cikit::junit;
-use cikit::{console::ConsoleNotifier, notify::Notifier};
+use cikit::{
+    console::ConsoleNotifier, github::GithubContext, notify::Notifier, slack::SlackNotifier,
+};
 
-use junit::{TestSuite, TestSuiteVisitor};
+use junit::{Summary, TestSuite, TestSuiteVisitor};
 use std::{env, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 
@@ -49,55 +51,67 @@ impl FromStr for ReportSorting {
 }
 #[derive(Debug, StructOpt)]
 enum Cmd {
+    ///Notifies the build outcome via Slack
+    Notify { github_event_file: PathBuf },
+    ///Reads the Junit test report
     TestReport {
-        #[structopt(short, long)]
-        project_dir: Option<PathBuf>,
         #[structopt(short, long, help = "time [ASC|DESC]")]
         sort_by: Option<ReportSorting>,
     },
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "cinotify", about = "A toy notifier tool.")]
+#[structopt(name = "cikit", about = "The continuous integration reporting toolkit")]
 struct Opt {
     /// Input file
     #[structopt(short, long, parse(from_os_str))]
     config_path: PathBuf,
+    //positional param
+    project_dir: Option<PathBuf>,
     #[structopt(subcommand)]
     cmd: Cmd,
 }
 
-fn main() -> junit::Result<()> {
+fn read_testdata(
+    project_dir: Option<PathBuf>,
+    config: &Config,
+    sort_by: Option<ReportSorting>,
+) -> anyhow::Result<(Summary, Vec<TestSuite>)> {
+    let current_dir = env::current_dir()?;
+    let project_dir = project_dir.unwrap_or_else(|| current_dir);
+
+    let mut test_suites: Vec<TestSuite> =
+        TestSuiteVisitor::from_basedir(project_dir, &config.junit.report_dir_pattern)?.collect();
+    if let Some(ReportSorting::Time(order)) = sort_by {
+        test_suites.sort_by(|a, b| {
+            if order == SortingOrder::Asc {
+                a.time.cmp(&b.time)
+            } else {
+                b.time.cmp(&a.time)
+            }
+        })
+    }
+
+    let summary = junit::Summary::from_suites(&test_suites);
+    Ok((summary, test_suites))
+}
+
+fn main() -> anyhow::Result<()> {
     env_logger::init();
     let opt = Opt::from_args();
     let cmd = opt.cmd;
     let config = Config::from_file(opt.config_path)?;
     match cmd {
-        Cmd::TestReport {
-            project_dir,
-            sort_by,
-        } => {
-            let current_dir = env::current_dir()?;
-            let project_dir = project_dir.unwrap_or_else(|| current_dir);
-            let mut test_suites: Vec<TestSuite> =
-                TestSuiteVisitor::from_basedir(project_dir, &config.junit.report_dir_pattern)?
-                    .collect();
-            if let Some(ReportSorting::Time(order)) = sort_by {
-                test_suites.sort_by(|a, b| {
-                    if order == SortingOrder::Asc {
-                        a.time.cmp(&b.time)
-                    } else {
-                        b.time.cmp(&a.time)
-                    }
-                })
-            }
-
-            let summary = junit::Summary::from_suites(&test_suites);
+        Cmd::Notify { github_event_file } => {
+            let (summary, test_suites) = read_testdata(opt.project_dir, &config, None)?;
+            let ctx = GithubContext::from_file(github_event_file)?;
+            let mut notifier = SlackNotifier::new(config.notifications);
+            notifier.notify((summary, test_suites), ctx)
+        }
+        Cmd::TestReport { sort_by } => {
+            let (summary, test_suites) = read_testdata(opt.project_dir, &config, sort_by)?;
             let mut console_notifier = ConsoleNotifier::stdout();
-            console_notifier
-                .notify((summary, test_suites), ())
-                .expect("Failed to write to console");
+            console_notifier.notify((summary, test_suites), ())
         }
     }
-    Ok(())
 }

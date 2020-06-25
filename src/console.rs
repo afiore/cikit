@@ -44,7 +44,7 @@ impl ConsoleDisplay for TestCase {
             "{}{} {:6} {}",
             INDENT_STR.repeat(depth),
             outcome_gpyph,
-            self.time,
+            display_duration(self.time.to_std().unwrap()),
             self.name
         )?;
         if let Some(failure) = &self.failure {

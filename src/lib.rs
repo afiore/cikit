@@ -1,6 +1,7 @@
 extern crate anyhow;
 extern crate chrono;
 extern crate glob;
+extern crate reqwest;
 extern crate serde_derive;
 extern crate serde_xml_rs;
 

@@ -29,7 +29,7 @@ where
 {
     use serde::de::Error;
     let secs = f32::deserialize(deserializer)?;
-    Duration::from_std(std::time::Duration::from_secs_f32(secs)).map_err(|_| Error::custom("Cannot parse duration"))
+    Duration::from_std(std::time::Duration::from_secs_f32(secs.abs())).map_err(|_| Error::custom("Cannot parse duration"))
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -73,7 +73,8 @@ impl TestSuite {
 pub struct TestCase {
     pub name: String,
     pub classname: String,
-    pub time: f32,
+    #[serde(deserialize_with = "f32_to_duration")]
+    pub time: Duration,
     pub failure: Option<TestFailure>,
     skipped: Option<TestSkipped>,
 }
@@ -108,7 +109,7 @@ impl TestCase {
 pub struct FailedTestCase {
     pub name: String,
     pub classname: String,
-    pub time: f32,
+    pub time: Duration,
     pub failure: TestFailure,
 }
 #[derive(Debug, PartialEq, Deserialize)]
@@ -348,7 +349,7 @@ com.example
                     "LiveTopicCounter should raise an error when the supplied topic does not exist"
                         .to_owned(),
                 classname: "com.example.LiveTopicCounterTest".to_owned(),
-                time: 0.079,
+                time: Duration::zero() + Duration::milliseconds(079),
                 failure: None,
                 skipped: None,
             },
@@ -356,7 +357,7 @@ com.example
                 name:
                         "LiveTopicCounter should skip this test".to_owned(),
                 classname: "com.example.LiveTopicCounterTest".to_owned(),
-                time: 0.001,
+                time: Duration::zero() + Duration::milliseconds(1),
                 failure: None,
                 skipped: Some(TestSkipped{}),
             },
@@ -373,7 +374,7 @@ com.example
         let failed = FailedTestCase {
             name: "TopicCounter should count a partitioned topic".to_owned(),
             classname: "com.example.LiveTopicCounterTest".to_owned(),
-            time: 0.461,
+            time: Duration::zero() + Duration::milliseconds(461),
             failure: TestFailure {
                 message: "100 did not equal 101".to_owned(),
                 classname: "org.scalatest.exceptions.TestFailedException".to_owned(),

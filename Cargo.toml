@@ -18,7 +18,7 @@ env_logger = "0.7"
 log = "0.4"
 toml = "0.5"
 structopt = "0.3"
-hyper = "0.13"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
 glob = "0.3.0"
 humantime = "2.0"
 

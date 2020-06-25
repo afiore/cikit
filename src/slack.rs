@@ -38,19 +38,31 @@ struct Text {
 
 pub struct SlackNotifier {
     config: Notifications,
+    client: reqwest::blocking::Client,
 }
 
 impl SlackNotifier {
     pub fn new(config: Notifications) -> Self {
-        SlackNotifier { config }
+        SlackNotifier {
+            config,
+            client: reqwest::blocking::Client::new(),
+        }
     }
 }
 
 impl Notifier for SlackNotifier {
     type Event = (Summary, Vec<TestSuite>);
     type CIContext = GithubContext;
-    fn notify(&mut self, event: Self::Event, ctx: Self::CIContext) -> anyhow::Result<()> {
-        todo!()
+    fn notify(&mut self, _event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
+        match &self.config {
+            Notifications::Slack {
+                user_handles,
+                webhook_url,
+            } => {
+                self.client.post(webhook_url).send()?;
+                Ok(())
+            }
+        }
     }
 }
 
