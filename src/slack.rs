@@ -1,6 +1,6 @@
 use crate::config::Notifications;
 use crate::github::GithubContext;
-use crate::junit::{FailedTestSuite, Summary, TestOutcome, TestSuite};
+use crate::junit::{self, FailedTestSuite, Summary, TestSuitesOutcome};
 use crate::notify::Notifier;
 use serde::Deserialize;
 
@@ -36,11 +36,11 @@ enum Block {
 }
 
 impl Block {
-    fn failed_testsuites(suites: Vec<FailedTestSuite>) -> Block {
-        let mut mrkdwn = "*Failed test suites:*\n".to_owned();
+    fn failed_testsuite(suite: &FailedTestSuite) -> Block {
+        let mut mrkdwn = format!("*{}*\n", suite.name).to_owned();
 
-        for suite in suites {
-            mrkdwn.push_str(&format!("- `{}`\n", &suite.name))
+        for test in &suite.failed_testcases {
+            mrkdwn.push_str(&format!("- `{}`\n", &test.name))
         }
 
         Block::Section {
@@ -52,19 +52,21 @@ impl Block {
         Block::Section {
             text: Text::mrkdwn(headline),
             fields: vec![
-                Text::plain("total_time"),
-                Text::plain(&format_duration(summary.total_time.to_std().unwrap()).to_string()),
+                Text::mrkdwn("*total_time*"),
+                Text::plain(
+                    &junit::display::duration(summary.total_time.to_std().unwrap()).to_string(),
+                ),
                 //
-                Text::plain("tests"),
+                Text::mrkdwn("*tests*"),
                 Text::plain(&format!("{}", summary.tests)),
                 //
-                Text::plain("failures"),
+                Text::mrkdwn("*failures*"),
                 Text::plain(&format!("{}", summary.failures)),
                 //
-                Text::plain("errors"),
+                Text::mrkdwn("*errors*"),
                 Text::plain(&format!("{}", summary.errors)),
                 //
-                Text::plain("skipped"),
+                Text::mrkdwn("*skipped*"),
                 Text::plain(&format!("{}", summary.skipped)),
             ],
         }
@@ -115,7 +117,7 @@ impl SlackNotifier {
 }
 
 impl Notifier for SlackNotifier {
-    type Event = TestOutcome;
+    type Event = TestSuitesOutcome;
     type CIContext = GithubContext;
     fn notify(&mut self, event: Self::Event, ctx: Self::CIContext) -> anyhow::Result<()> {
         match &self.config {
@@ -141,21 +143,32 @@ impl Notifier for SlackNotifier {
                 let summary_block = Block::headline_with_summary(&headline, event.summary());
 
                 let message: Blocks = match event {
-                    TestOutcome::Failure {
+                    TestSuitesOutcome::Failure {
                         failed_testsuites, ..
-                    } => Blocks {
-                        blocks: vec![
+                    } => {
+                        let failed_suites_blocks: Vec<Block> = failed_testsuites
+                            .iter()
+                            .map(|suite| Block::failed_testsuite(&suite))
+                            .collect();
+
+                        let mut blocks = vec![
                             summary_block,
                             Block::Divider,
-                            Block::failed_testsuites(failed_testsuites),
-                        ],
-                    },
-                    TestOutcome::Success(_) => Blocks {
+                            Block::Section {
+                                text: Text::mrkdwn("Failed test suites:"),
+                                fields: vec![],
+                            },
+                            Block::Divider,
+                        ];
+
+                        blocks.extend(failed_suites_blocks);
+
+                        Blocks { blocks }
+                    }
+                    TestSuitesOutcome::Success(_) => Blocks {
                         blocks: vec![summary_block, Block::Divider],
                     },
                 };
-
-                let message_json = serde_json::to_string_pretty(&message)?;
 
                 let mut response_body = String::new();
                 let mut resp = self.client.post(webhook_url).json(&message).send()?;

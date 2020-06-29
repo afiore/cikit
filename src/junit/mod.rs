@@ -1,13 +1,18 @@
+use crate::config::Config;
+use chrono::{Duration, NaiveDateTime};
 use glob::{glob_with, MatchOptions};
-use serde::{Deserializer, Deserialize};
+use log::debug;
+use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::io;
 use std::{
+    env,
     ffi::OsStr,
     path::{Path, PathBuf},
+    str::FromStr,
 };
+use structopt::StructOpt;
 use thiserror::Error;
-use chrono::{NaiveDateTime, Duration};
 
 #[derive(Error, Debug)]
 pub enum JunitError {
@@ -29,16 +34,17 @@ where
 {
     use serde::de::Error;
     let secs = f32::deserialize(deserializer)?;
-    Duration::from_std(std::time::Duration::from_secs_f32(secs.abs())).map_err(|_| Error::custom("Cannot parse duration"))
+    Duration::from_std(std::time::Duration::from_secs_f32(secs.abs()))
+        .map_err(|_| Error::custom("Cannot parse duration"))
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TestSuite {
     pub name: String,
-    pub tests: u16,
-    pub errors: u16,
-    pub failures: u16,
-    pub skipped: Option<u16>,
+    pub tests: usize,
+    pub errors: usize,
+    pub failures: usize,
+    pub skipped: Option<usize>,
     #[serde(deserialize_with = "f32_to_duration")]
     pub time: Duration,
     pub timestamp: NaiveDateTime,
@@ -47,7 +53,7 @@ pub struct TestSuite {
 }
 
 impl TestSuite {
-    pub fn skipped(&self) -> u16 {
+    pub fn skipped(&self) -> usize {
         self.skipped.unwrap_or_default()
     }
     pub fn is_successful(&self) -> bool {
@@ -64,16 +70,27 @@ impl TestSuite {
         if failed_testcases.is_empty() {
             None
         } else {
-        Some(FailedTestSuite {
-            name: self.name,
-            time: self.time,
-            timestamp: self.timestamp,
-            failed_testcases: failed_testcases,
-        })
-
+            Some(FailedTestSuite {
+                name: self.name,
+                time: self.time,
+                timestamp: self.timestamp,
+                failed_testcases: failed_testcases,
+            })
         }
+    }
+}
 
-
+impl HasOutcome for TestSuite {
+    fn outcome(&self) -> TestOutcome {
+        if self.skipped() > 0 && self.skipped() == self.testcases.len() {
+            TestOutcome::Skipped
+        } else {
+            if self.failures > 0 {
+                TestOutcome::Failure
+            } else {
+                TestOutcome::Success
+            }
+        }
     }
 }
 
@@ -93,9 +110,7 @@ impl TestCase {
     pub fn is_successful(&self) -> bool {
         self.failure.is_none()
     }
-}
 
-impl TestCase {
     fn as_failed(self) -> Option<FailedTestCase> {
         if let Some(failure) = self.failure {
             Some(FailedTestCase {
@@ -109,6 +124,15 @@ impl TestCase {
         }
     }
 }
+impl HasOutcome for TestCase {
+    fn outcome(&self) -> TestOutcome {
+        match (self.is_skipped(), &self.failure) {
+            (true, _) => TestOutcome::Skipped,
+            (_, Some(_)) => TestOutcome::Failure,
+            (_, None) => TestOutcome::Success,
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct FailedTestCase {
@@ -118,88 +142,156 @@ pub struct FailedTestCase {
     pub failure: TestFailure,
 }
 #[derive(Debug, PartialEq, Deserialize)]
-pub struct TestSkipped{}
+pub struct TestSkipped {}
 
+#[derive(Clone)]
 pub struct Summary {
     pub total_time: Duration,
-    pub tests: u16,
-    pub failures: u16,
-    pub errors: u16,
-    pub skipped: u16,
-}
-
-impl From<&Vec<TestSuite>> for Summary {
-   fn from(suites: &Vec<TestSuite>) -> Self {
-        let mut total_time = Duration::zero();
-        let mut tests = 0;
-        let mut failures = 0;
-        let mut errors = 0;
-        let mut skipped = 0;
-
-        for suite in suites {
-            total_time = total_time + suite.time;
-            tests += suite.tests;
-            failures += suite.failures;
-            errors += suite.errors;
-            skipped += suite.skipped();
-
-        }
-        Summary {
-            total_time,
-            tests,
-            failures,
-            errors,
-            skipped
-        }
-    }
-
+    pub tests: usize,
+    pub failures: usize,
+    pub errors: usize,
+    pub skipped: usize,
 }
 
 impl Summary {
     pub fn is_successful(&self) -> bool {
         self.failures == 0 && self.errors == 0
     }
-
+    fn inc(&mut self, suite: &TestSuite) {
+        self.total_time = self.total_time + suite.time;
+        self.tests += suite.tests;
+        self.errors += suite.errors;
+        self.failures += suite.failures;
+        self.skipped += suite.skipped();
+    }
+    fn empty() -> Self {
+        Summary {
+            total_time: Duration::zero(),
+            tests: 0,
+            failures: 0,
+            errors: 0,
+            skipped: 0,
+        }
+    }
 }
 
-pub enum TestOutcome {
+enum TestOutcome {
+    Success,
+    Failure,
+    Skipped,
+}
+
+//TODO: is this needed?
+trait HasOutcome {
+    fn outcome(&self) -> TestOutcome;
+}
+
+#[derive(Debug, PartialEq, StructOpt)]
+pub enum SortingOrder {
+    Asc,
+    Desc,
+}
+
+impl FromStr for SortingOrder {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match &*s.to_uppercase() {
+            "ASC" => Ok(SortingOrder::Asc),
+            "DESC" => Ok(SortingOrder::Desc),
+            _ => Err(anyhow::Error::msg(format!(
+                "Cannot parse `SortingOrder`, invalid token {}",
+                s
+            ))),
+        }
+    }
+}
+
+#[derive(Debug, StructOpt)]
+pub enum ReportSorting {
+    Time(SortingOrder),
+}
+impl FromStr for ReportSorting {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let chunks: Vec<&str> = s.split(" ").take(2).collect();
+        if chunks.len() == 1 && chunks[0].to_lowercase() == "time" {
+            Ok(ReportSorting::Time(SortingOrder::Desc))
+        } else if chunks.len() == 2 && chunks[0].to_lowercase() == "time" {
+            let order = SortingOrder::from_str(chunks[1])?;
+            Ok(ReportSorting::Time(order))
+        } else {
+            Err(anyhow::Error::msg(format!(
+                "Cannot parse `SortingOrder`, invalid token {}",
+                s
+            )))
+        }
+    }
+}
+
+pub fn read_testsuites(
+    project_dir: Option<PathBuf>,
+    config: &Config,
+    sort_by: Option<ReportSorting>,
+) -> anyhow::Result<(Vec<TestSuite>, Summary)> {
+    let current_dir = env::current_dir()?;
+    let project_dir = project_dir.unwrap_or_else(|| current_dir);
+    let visitor = TestSuiteVisitor::from_basedir(project_dir, &config.junit.report_dir_pattern)?;
+    let summary = visitor.summary();
+
+    let mut test_suites: Vec<TestSuite> = visitor.collect();
+    if let Some(ReportSorting::Time(order)) = sort_by {
+        test_suites.sort_by(|a, b| {
+            if order == SortingOrder::Asc {
+                a.time.cmp(&b.time)
+            } else {
+                b.time.cmp(&a.time)
+            }
+        })
+    }
+    Ok((test_suites, summary))
+}
+
+pub enum TestSuitesOutcome {
     Success(Summary),
-    Failure { summary: Summary, failed_testsuites: Vec<FailedTestSuite> }
+    Failure {
+        summary: Summary,
+        failed_testsuites: Vec<FailedTestSuite>,
+    },
 }
-impl TestOutcome { 
+impl TestSuitesOutcome {
     pub fn summary(&self) -> &Summary {
         match self {
-            TestOutcome::Success(summary) => summary,
-            TestOutcome::Failure { summary, .. } => summary,
+            TestSuitesOutcome::Success(summary) => summary,
+            TestSuitesOutcome::Failure { summary, .. } => summary,
         }
     }
     pub fn is_successful(&self) -> bool {
         match self {
-             TestOutcome::Success(_) => true,
-             _ => false,
-        }
-
-    }
-}
-
-impl From<Vec<TestSuite>> for TestOutcome {
-    fn from(test_suites: Vec<TestSuite>) -> Self {
-    let summary = Summary::from(&test_suites);
-    if summary.is_successful() {
-        TestOutcome::Success(summary)
-    } else {
-        let failed_testsuites = test_suites
-            .into_iter()
-            .filter_map(|suite| suite.as_failed())
-            .collect();
-        TestOutcome::Failure {
-            summary,
-            failed_testsuites,
+            TestSuitesOutcome::Success(_) => true,
+            _ => false,
         }
     }
 
-    }
+    pub fn read(
+        project_dir: Option<PathBuf>,
+        config: &Config,
+        sort_by: Option<ReportSorting>,
+    ) -> anyhow::Result<Self> {
+        let (suites, summary) = read_testsuites(project_dir, config, sort_by)?;
 
+        if summary.is_successful() {
+            Ok(TestSuitesOutcome::Success(summary))
+        } else {
+            let failed_testsuites = suites
+                .into_iter()
+                .filter_map(|suite| suite.as_failed())
+                .collect();
+            Ok(TestSuitesOutcome::Failure {
+                summary,
+                failed_testsuites,
+            })
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -220,7 +312,7 @@ pub struct FailedTestSuite {
 }
 
 fn read_suite<R: io::Read>(input: R) -> Result<TestSuite> {
-    let suite: TestSuite  = serde_xml_rs::from_reader(input)?;
+    let suite: TestSuite = serde_xml_rs::from_reader(input)?;
     Ok(suite)
 }
 
@@ -234,6 +326,7 @@ impl ReportVisitor {
         let mut report_files: Vec<PathBuf> = Vec::new();
         let prefixed_dir_pattern =
             vec![base_dir.as_ref().to_str().unwrap(), report_dir_pattern].join("/");
+
         let paths = glob_with(
             &prefixed_dir_pattern,
             MatchOptions {
@@ -242,6 +335,7 @@ impl ReportVisitor {
                 require_literal_leading_dot: true,
             },
         )?;
+
         for path in paths {
             if let Ok(path) = path {
                 if path.is_dir() {
@@ -256,6 +350,8 @@ impl ReportVisitor {
             }
         }
 
+        debug!("{} report files found", report_files.len());
+
         Ok(ReportVisitor {
             report_files,
             position: 0,
@@ -265,25 +361,29 @@ impl ReportVisitor {
 impl Iterator for ReportVisitor {
     type Item = PathBuf;
     fn next(&mut self) -> Option<Self::Item> {
-      if self.position >= self.report_files.len() {
-          None
-      } else {
-          let item = self.report_files[self.position].to_owned();
-          self.position += 1;
-          Some(item)
-      }
+        if self.position >= self.report_files.len() {
+            None
+        } else {
+            let item = self.report_files[self.position].to_owned();
+            self.position += 1;
+            Some(item)
+        }
     }
 }
 
-
 pub struct TestSuiteVisitor {
-    visitor: ReportVisitor
+    summary: Summary,
+    visitor: ReportVisitor,
 }
 
 impl TestSuiteVisitor {
+    pub fn summary(&self) -> Summary {
+        self.summary.clone()
+    }
     pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
         let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
-        Ok(TestSuiteVisitor { visitor })
+        let summary = Summary::empty();
+        Ok(TestSuiteVisitor { visitor, summary })
     }
 }
 impl Iterator for TestSuiteVisitor {
@@ -291,42 +391,14 @@ impl Iterator for TestSuiteVisitor {
     fn next(&mut self) -> Option<Self::Item> {
         let path = self.visitor.next()?;
         let display_path = path.display();
-        let file = fs::File::open(path.clone()).expect(&format!("Couldn't open report file: {}", display_path));
-        let suite =  read_suite(file).expect(&format!("Couldn't parse junit TestSuite from XML report {}", display_path));
+        let file = fs::File::open(path.clone())
+            .expect(&format!("Couldn't open report file: {}", display_path));
+        let suite = read_suite(file).expect(&format!(
+            "Couldn't parse junit TestSuite from XML report {}",
+            display_path
+        ));
+        self.summary.inc(&suite);
         Some(suite)
-    }
-}
-
-
-
-pub struct FailedTestSuiteVisitor {
-    visitor: TestSuiteVisitor
-}
-
-impl FailedTestSuiteVisitor {
-    pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
-        let visitor = TestSuiteVisitor::from_basedir(base_dir, report_dir_pattern)?;
-        Ok(FailedTestSuiteVisitor { visitor })
-    }
-}
-
-impl Iterator for FailedTestSuiteVisitor {
-    type Item = FailedTestSuite;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.visitor.next() {
-                 Some(suite) if suite.is_successful() => {
-                     continue;
-                 },
-                 Some(suite) => {
-                     return Some(suite.as_failed().unwrap())
-                 },
-                 _ => {
-                     return None
-                 }
-            }
-        }
     }
 }
 
@@ -337,11 +409,11 @@ mod tests {
     extern crate uuid;
 
     use super::*;
-    use serde_xml_rs::from_reader;
+    use chrono::NaiveDate;
     use pretty_assertions::assert_eq;
+    use serde_xml_rs::from_reader;
     use std::env;
     use uuid::Uuid;
-    use chrono::NaiveDate;
 
     const SUCCESS_TESTSUITE_XML: &str = r##"
 <testsuite hostname="lenstop" name="com.example.LiveTopicCounterTest" tests="1" errors="0" failures="0" skipped="0" time="2.137" timestamp="2020-06-07T14:18:12">
@@ -392,7 +464,7 @@ com.example
             errors: 0,
             failures: 0,
             skipped: Some(0),
-            time: Duration::nanoseconds(137000064) + Duration::seconds(2),//2.137,
+            time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
             timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
             testcases: vec![
                 TestCase {
@@ -413,7 +485,6 @@ com.example
                 skipped: Some(TestSkipped{}),
             },
 
-            
             ],
         };
         assert_eq!(summary, expected);
@@ -434,7 +505,7 @@ com.example
         };
         let expected = FailedTestSuite {
             name: "com.example.LiveTopicCounterTest".to_owned(),
-            time: Duration::nanoseconds(137000064) + Duration::seconds(2),//2.137,
+            time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
             timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 13),
             failed_testcases: vec![failed],
         };
@@ -469,7 +540,7 @@ com.example
 
         for test_suite in visitor {
             if let Some(failed_suite) = test_suite.as_failed() {
-              failed_suites.push(failed_suite);
+                failed_suites.push(failed_suite);
             }
         }
         assert_eq!(failed_suites.len(), 3);
@@ -508,3 +579,5 @@ com.example
         Ok(())
     }
 }
+
+pub mod display;

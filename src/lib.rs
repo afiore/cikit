@@ -1,5 +1,6 @@
 extern crate anyhow;
 extern crate chrono;
+extern crate colored;
 extern crate glob;
 extern crate reqwest;
 extern crate serde_derive;
