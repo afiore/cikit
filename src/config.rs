@@ -32,12 +32,9 @@ impl Config {
 }
 
 mod tests {
-    use super::*;
-    use crate::github::GithubHandle;
-    use crate::slack::SlackUserId;
-
     #[test]
     fn parse_from_toml() {
+        use super::*;
         let config: Config = toml::from_str(
             r#"
         [notifications]

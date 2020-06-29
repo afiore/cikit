@@ -4,7 +4,7 @@ use crate::junit::{self, FailedTestSuite, Summary, TestSuitesOutcome};
 use crate::notify::Notifier;
 use serde::Deserialize;
 
-use humantime::format_duration;
+
 use std::{fmt::Display, io::Read};
 
 use log::warn;

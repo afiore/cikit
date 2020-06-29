@@ -4,8 +4,8 @@ use cikit::{
     console::ConsoleNotifier, github::GithubContext, notify::Notifier, slack::SlackNotifier,
 };
 
-use junit::{ReportSorting, Summary, TestSuite, TestSuiteVisitor, TestSuitesOutcome};
-use std::{env, path::PathBuf, str::FromStr};
+use junit::{ReportSorting, TestSuitesOutcome};
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
