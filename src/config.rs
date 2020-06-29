@@ -1,18 +1,13 @@
+use crate::{github::GithubHandle, slack::SlackUserId};
 use serde_derive::Deserialize;
 use std::fs;
 use std::{collections::BTreeMap, io, path::Path};
-
-#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize)]
-pub struct GitHandle(String);
-
-#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize)]
-pub struct IMHandle(String);
 
 #[derive(PartialEq, Debug, Deserialize)]
 #[serde(tag = "type")]
 pub enum Notifications {
     Slack {
-        user_handles: BTreeMap<GitHandle, IMHandle>,
+        user_handles: BTreeMap<GithubHandle, SlackUserId>,
         webhook_url: String,
     },
 }
@@ -38,6 +33,8 @@ impl Config {
 
 mod tests {
     use super::*;
+    use crate::github::GithubHandle;
+    use crate::slack::SlackUserId;
 
     #[test]
     fn parse_from_toml() {
@@ -48,8 +45,8 @@ mod tests {
         webhook_url = "https://hooks.slack.com/services/x"
 
         [notifications.user_handles]
-        user_1 = "userone"
-        user_2 = "usertwo"
+        user_1 = "U024BE7LH"
+        user_2 = "U058ZU1KY"
 
         [junit]
         report_dir_pattern = "**/target/**/test-reports"
@@ -58,12 +55,12 @@ mod tests {
         .unwrap();
         let mut handles = BTreeMap::new();
         handles.insert(
-            GitHandle("user_1".to_owned()),
-            IMHandle("userone".to_owned()),
+            GithubHandle("user_1".to_owned()),
+            SlackUserId("U024BE7LH".to_owned()),
         );
         handles.insert(
-            GitHandle("user_2".to_owned()),
-            IMHandle("usertwo".to_owned()),
+            GithubHandle("user_2".to_owned()),
+            SlackUserId("U058ZU1KY".to_owned()),
         );
 
         assert_eq!(

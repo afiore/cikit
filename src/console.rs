@@ -41,7 +41,7 @@ impl ConsoleDisplay for TestCase {
         };
         writeln!(
             f,
-            "{}{} {:6} {}",
+            "{}{} {:10} {}",
             INDENT_STR.repeat(depth),
             outcome_gpyph,
             display_duration(self.time.to_std().unwrap()),

@@ -3,12 +3,15 @@ use serde::Deserialize;
 use serde_json;
 use std::{fs, io::BufReader, path::Path};
 
+#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize)]
+pub struct GithubHandle(pub String);
+
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct GithubContext {
     pub token: String,
     pub sha: String,
     pub run_id: String,
-    pub actor: String,
+    pub actor: GithubHandle,
     pub event: GithubEvent,
 }
 
@@ -22,25 +25,22 @@ impl GithubContext {
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
-#[serde(untagged)]
-pub enum GithubEvent {
-    PREvent {
-        number: u32, //pr number
-        pull_request: PullRequest,
-        sender: GithubUser,
-    },
+pub struct GithubEvent {
+    pub number: u32, //pr number
+    pub pull_request: PullRequest,
+    pub sender: GithubUser,
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct PullRequest {
-    title: String,
-    html_url: String,
+    pub title: String,
+    pub html_url: String,
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct GithubUser {
     pub avatar_url: String,
-    pub login: String,
+    pub login: GithubHandle,
     pub url: String,
 }
 

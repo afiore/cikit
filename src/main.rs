@@ -4,7 +4,7 @@ use cikit::{
     console::ConsoleNotifier, github::GithubContext, notify::Notifier, slack::SlackNotifier,
 };
 
-use junit::{Summary, TestSuite, TestSuiteVisitor};
+use junit::{Summary, TestOutcome, TestSuite, TestSuiteVisitor};
 use std::{env, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 
@@ -72,11 +72,12 @@ struct Opt {
     cmd: Cmd,
 }
 
+//TODO: move into Junit
 fn read_testdata(
     project_dir: Option<PathBuf>,
     config: &Config,
     sort_by: Option<ReportSorting>,
-) -> anyhow::Result<(Summary, Vec<TestSuite>)> {
+) -> anyhow::Result<Vec<TestSuite>> {
     let current_dir = env::current_dir()?;
     let project_dir = project_dir.unwrap_or_else(|| current_dir);
 
@@ -91,9 +92,7 @@ fn read_testdata(
             }
         })
     }
-
-    let summary = junit::Summary::from_suites(&test_suites);
-    Ok((summary, test_suites))
+    Ok(test_suites)
 }
 
 fn main() -> anyhow::Result<()> {
@@ -103,13 +102,15 @@ fn main() -> anyhow::Result<()> {
     let config = Config::from_file(opt.config_path)?;
     match cmd {
         Cmd::Notify { github_event_file } => {
-            let (summary, test_suites) = read_testdata(opt.project_dir, &config, None)?;
+            let test_suites = read_testdata(opt.project_dir, &config, None)?;
+            let outcome = TestOutcome::from(test_suites);
             let ctx = GithubContext::from_file(github_event_file)?;
             let mut notifier = SlackNotifier::new(config.notifications);
-            notifier.notify((summary, test_suites), ctx)
+            notifier.notify(outcome, ctx)
         }
         Cmd::TestReport { sort_by } => {
-            let (summary, test_suites) = read_testdata(opt.project_dir, &config, sort_by)?;
+            let test_suites = read_testdata(opt.project_dir, &config, sort_by)?;
+            let summary = Summary::from(&test_suites);
             let mut console_notifier = ConsoleNotifier::stdout();
             console_notifier.notify((summary, test_suites), ())
         }

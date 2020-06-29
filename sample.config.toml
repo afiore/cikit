@@ -1,10 +1,11 @@
 [notifications]
 type = "Slack"
-webhook_url = "https://hooks.slack.com/services/x"
+webhook_url = "https://hooks.slack.com/services/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"
 
 [notifications.user_handles]
 user_1 = "userone"
 user_2 = "usertwo"
+kowallen = "UP3UUK469"
 
 [junit]
 report_dir_pattern = "**/target/test-reports"

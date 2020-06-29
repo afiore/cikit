@@ -1,9 +1,23 @@
 use crate::config::Notifications;
 use crate::github::GithubContext;
-use crate::junit::{Summary, TestSuite};
+use crate::junit::{FailedTestSuite, Summary, TestOutcome, TestSuite};
 use crate::notify::Notifier;
+use serde::Deserialize;
 
+use humantime::format_duration;
+use std::{fmt::Display, io::Read};
+
+use log::warn;
 use serde::Serialize;
+
+#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize)]
+pub struct SlackUserId(pub String);
+
+impl Display for SlackUserId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug, PartialEq, Serialize)]
 struct Blocks {
@@ -21,6 +35,42 @@ enum Block {
     },
 }
 
+impl Block {
+    fn failed_testsuites(suites: Vec<FailedTestSuite>) -> Block {
+        let mut mrkdwn = "*Failed test suites:*\n".to_owned();
+
+        for suite in suites {
+            mrkdwn.push_str(&format!("- `{}`\n", &suite.name))
+        }
+
+        Block::Section {
+            text: Text::mrkdwn(&mrkdwn),
+            fields: vec![],
+        }
+    }
+    fn headline_with_summary(headline: &str, summary: &Summary) -> Block {
+        Block::Section {
+            text: Text::mrkdwn(headline),
+            fields: vec![
+                Text::plain("total_time"),
+                Text::plain(&format_duration(summary.total_time.to_std().unwrap()).to_string()),
+                //
+                Text::plain("tests"),
+                Text::plain(&format!("{}", summary.tests)),
+                //
+                Text::plain("failures"),
+                Text::plain(&format!("{}", summary.failures)),
+                //
+                Text::plain("errors"),
+                Text::plain(&format!("{}", summary.errors)),
+                //
+                Text::plain("skipped"),
+                Text::plain(&format!("{}", summary.skipped)),
+            ],
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum TextType {
@@ -33,7 +83,21 @@ struct Text {
     #[serde(rename = "type")]
     text_type: TextType,
     text: String,
-    emoji: bool,
+}
+
+impl Text {
+    pub fn plain(s: &str) -> Self {
+        Text {
+            text_type: TextType::PlainText,
+            text: s.to_owned(),
+        }
+    }
+    pub fn mrkdwn(s: &str) -> Self {
+        Text {
+            text_type: TextType::Mrkdwn,
+            text: s.to_owned(),
+        }
+    }
 }
 
 pub struct SlackNotifier {
@@ -51,15 +115,57 @@ impl SlackNotifier {
 }
 
 impl Notifier for SlackNotifier {
-    type Event = (Summary, Vec<TestSuite>);
+    type Event = TestOutcome;
     type CIContext = GithubContext;
-    fn notify(&mut self, _event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
+    fn notify(&mut self, event: Self::Event, ctx: Self::CIContext) -> anyhow::Result<()> {
         match &self.config {
             Notifications::Slack {
                 user_handles,
                 webhook_url,
             } => {
-                self.client.post(webhook_url).send()?;
+                let mut headline = String::new();
+                if let Some(slack_handle) = user_handles.get(&ctx.actor) {
+                    headline.push_str(&format!("<@{}> ", slack_handle))
+                }
+                //TODO: add link to github workflow run
+                headline.push_str(&format!(
+                    "build for PR <{}|{}>",
+                    ctx.event.pull_request.html_url, ctx.event.pull_request.title
+                ));
+
+                if event.is_successful() {
+                    headline.push_str(" :heavy_tick:");
+                } else {
+                    headline.push_str(" :heavy_exclamation_mark:");
+                }
+                let summary_block = Block::headline_with_summary(&headline, event.summary());
+
+                let message: Blocks = match event {
+                    TestOutcome::Failure {
+                        failed_testsuites, ..
+                    } => Blocks {
+                        blocks: vec![
+                            summary_block,
+                            Block::Divider,
+                            Block::failed_testsuites(failed_testsuites),
+                        ],
+                    },
+                    TestOutcome::Success(_) => Blocks {
+                        blocks: vec![summary_block, Block::Divider],
+                    },
+                };
+
+                let message_json = serde_json::to_string_pretty(&message)?;
+
+                let mut response_body = String::new();
+                let mut resp = self.client.post(webhook_url).json(&message).send()?;
+                if !resp.status().is_success() {
+                    resp.read_to_string(&mut response_body)?;
+                    warn!(
+                        "Server responded with non-successful status code: {}",
+                        response_body
+                    );
+                }
                 Ok(())
             }
         }
@@ -78,14 +184,12 @@ mod tests {
         let text = Text {
             text_type: TextType::PlainText,
             text: "some text".to_owned(),
-            emoji: true,
         };
 
         assert_eq!(
             json!({
                 "type": "plain_text",
                 "text": "some text",
-                "emoji": true
             }),
             serde_json::to_value(&text).unwrap()
         )
@@ -99,7 +203,6 @@ mod tests {
                     text: Text {
                         text_type: TextType::PlainText,
                         text: "some text".to_owned(),
-                        emoji: true,
                     },
                     fields: vec![],
                 },
@@ -115,7 +218,6 @@ mod tests {
                         "text": {
                            "type": "plain_text",
                            "text": "some text",
-                           "emoji": true
                          }
                     },
 

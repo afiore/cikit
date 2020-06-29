@@ -53,19 +53,27 @@ impl TestSuite {
     pub fn is_successful(&self) -> bool {
         self.failures == 0 && self.errors == 0
     }
-    fn as_failed(self) -> Result<FailedTestSuite> {
+    pub fn as_failed(self) -> Option<FailedTestSuite> {
         let mut failed_testcases: Vec<FailedTestCase> = Vec::new();
         for t in self.testcases {
             if !t.is_successful() {
-                failed_testcases.push(t.as_failed()?);
+                //TODO: review
+                failed_testcases.push(t.as_failed().unwrap());
             }
         }
-        Ok(FailedTestSuite {
+        if failed_testcases.is_empty() {
+            None
+        } else {
+        Some(FailedTestSuite {
             name: self.name,
             time: self.time,
             timestamp: self.timestamp,
             failed_testcases: failed_testcases,
         })
+
+        }
+
+
     }
 }
 
@@ -83,24 +91,21 @@ impl TestCase {
         self.skipped.is_some()
     }
     pub fn is_successful(&self) -> bool {
-        self.failure.is_none() && self.skipped.is_none()
+        self.failure.is_none()
     }
 }
 
 impl TestCase {
-    fn as_failed(self) -> Result<FailedTestCase> {
+    fn as_failed(self) -> Option<FailedTestCase> {
         if let Some(failure) = self.failure {
-            Ok(FailedTestCase {
+            Some(FailedTestCase {
                 name: self.name,
                 classname: self.classname,
                 time: self.time,
                 failure: failure,
             })
         } else {
-            Err(JunitError::InternalError(format!(
-                "as_failed called on a successful testcase {:?}",
-                self
-            )))
+            None
         }
     }
 }
@@ -123,16 +128,14 @@ pub struct Summary {
     pub skipped: u16,
 }
 
-impl Summary {
-    fn is_successful(&self) -> bool {
-        self.failures == 0 && self.errors == 0
-    }
-    pub fn from_suites(suites: &Vec<TestSuite>) -> Self {
+impl From<&Vec<TestSuite>> for Summary {
+   fn from(suites: &Vec<TestSuite>) -> Self {
         let mut total_time = Duration::zero();
         let mut tests = 0;
         let mut failures = 0;
         let mut errors = 0;
         let mut skipped = 0;
+
         for suite in suites {
             total_time = total_time + suite.time;
             tests += suite.tests;
@@ -149,6 +152,54 @@ impl Summary {
             skipped
         }
     }
+
+}
+
+impl Summary {
+    pub fn is_successful(&self) -> bool {
+        self.failures == 0 && self.errors == 0
+    }
+
+}
+
+pub enum TestOutcome {
+    Success(Summary),
+    Failure { summary: Summary, failed_testsuites: Vec<FailedTestSuite> }
+}
+impl TestOutcome { 
+    pub fn summary(&self) -> &Summary {
+        match self {
+            TestOutcome::Success(summary) => summary,
+            TestOutcome::Failure { summary, .. } => summary,
+        }
+    }
+    pub fn is_successful(&self) -> bool {
+        match self {
+             TestOutcome::Success(_) => true,
+             _ => false,
+        }
+
+    }
+}
+
+impl From<Vec<TestSuite>> for TestOutcome {
+    fn from(test_suites: Vec<TestSuite>) -> Self {
+    let summary = Summary::from(&test_suites);
+    if summary.is_successful() {
+        TestOutcome::Success(summary)
+    } else {
+        let failed_testsuites = test_suites
+            .into_iter()
+            .filter_map(|suite| suite.as_failed())
+            .collect();
+        TestOutcome::Failure {
+            summary,
+            failed_testsuites,
+        }
+    }
+
+    }
+
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -322,13 +373,13 @@ com.example
          </testsuite>
          "##;
 
-    fn read_failed_testsuite<R: io::Read>(input: R) -> Result<Option<FailedTestSuite>> {
-        let suite = read_suite(input)?;
+    fn read_failed_testsuite<R: io::Read>(input: R) -> Option<FailedTestSuite> {
+        let suite = read_suite(input).unwrap();
         if suite.is_successful() {
-            Ok(None)
+            None
         } else {
-            let failed_testsuite = suite.as_failed()?;
-            Ok(Some(failed_testsuite))
+            let failed_testsuite = suite.as_failed().unwrap();
+            Some(failed_testsuite)
         }
     }
 
@@ -393,17 +444,17 @@ com.example
     #[test]
     fn read_failed_testsuite_none() {
         let reader = SUCCESS_TESTSUITE_XML.as_bytes();
-        let result = read_failed_testsuite(reader).unwrap();
+        let result = read_failed_testsuite(reader);
         assert_eq!(result, None);
     }
     #[test]
     fn read_failed_testsuite_some() {
         let reader = FAILED_TESTSUITE_XML.as_bytes();
-        let result = read_failed_testsuite(reader).unwrap();
+        let result = read_failed_testsuite(reader);
         assert!(result.is_some())
     }
     #[test]
-    fn failed_testsuite_visitor() {
+    fn failed_testsuite() {
         let report_dir_pattern = "**/testreports";
         let mut dir = env::temp_dir();
         let mut failed_suites: Vec<FailedTestSuite> = Vec::new();
@@ -413,11 +464,13 @@ com.example
 
         create_report_dir(base_dir, "testreports", 3, 3, 7).expect("Couldn't setup test data");
 
-        let visitor = FailedTestSuiteVisitor::from_basedir(base_dir, report_dir_pattern)
+        let visitor = TestSuiteVisitor::from_basedir(base_dir, report_dir_pattern)
             .expect("Couldn't initialize visitor");
 
-        for failed_suite in visitor {
-            failed_suites.push(failed_suite);
+        for test_suite in visitor {
+            if let Some(failed_suite) = test_suite.as_failed() {
+              failed_suites.push(failed_suite);
+            }
         }
         assert_eq!(failed_suites.len(), 3);
     }
