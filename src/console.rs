@@ -1,4 +1,5 @@
-use colored::Colorize;
+use crate::junit::{HasOutcome, TestOutcome};
+use colored::{ColoredString, Colorize};
 use io::Result;
 use std::io;
 
@@ -32,18 +33,21 @@ impl ConsoleDisplay for TestFailure {
     }
 }
 
+fn outcome_gpyph(outcome: &TestOutcome) -> ColoredString {
+    match outcome {
+        TestOutcome::Skipped => "↪".blue(),
+        TestOutcome::Failure => "✗".red(),
+        TestOutcome::Success => "-".normal(),
+    }
+}
+
 impl ConsoleDisplay for TestCase {
     fn display(&self, f: &mut Box<dyn io::Write>, depth: usize) -> Result<()> {
-        let outcome_gpyph = match (self.is_skipped(), &self.failure) {
-            (true, _) => "↪".blue(),
-            (_, Some(_)) => "✗".red(),
-            (_, None) => "-".normal(),
-        };
         writeln!(
             f,
             "{}{} {:10} {}",
             INDENT_STR.repeat(depth),
-            outcome_gpyph,
+            outcome_gpyph(&self.outcome()),
             display::duration(self.time.to_std().unwrap()),
             self.name
         )?;

@@ -6,9 +6,11 @@ use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::io;
 use std::{
+    cell::RefCell,
     env,
     ffi::OsStr,
     path::{Path, PathBuf},
+    rc::Rc,
     str::FromStr,
 };
 use structopt::StructOpt;
@@ -175,14 +177,13 @@ impl Summary {
     }
 }
 
-enum TestOutcome {
+pub enum TestOutcome {
     Success,
     Failure,
     Skipped,
 }
 
-//TODO: is this needed?
-trait HasOutcome {
+pub trait HasOutcome {
     fn outcome(&self) -> TestOutcome;
 }
 
@@ -236,9 +237,9 @@ pub fn read_testsuites(
     let current_dir = env::current_dir()?;
     let project_dir = project_dir.unwrap_or_else(|| current_dir);
     let visitor = TestSuiteVisitor::from_basedir(project_dir, &config.junit.report_dir_pattern)?;
-    let summary = visitor.summary();
-
+    let summary_rc = visitor.summary.clone();
     let mut test_suites: Vec<TestSuite> = visitor.collect();
+    let summary = summary_rc.as_ref().borrow();
     if let Some(ReportSorting::Time(order)) = sort_by {
         test_suites.sort_by(|a, b| {
             if order == SortingOrder::Asc {
@@ -248,7 +249,7 @@ pub fn read_testsuites(
             }
         })
     }
-    Ok((test_suites, summary))
+    Ok((test_suites, summary.clone()))
 }
 
 pub enum TestSuitesOutcome {
@@ -372,17 +373,14 @@ impl Iterator for ReportVisitor {
 }
 
 pub struct TestSuiteVisitor {
-    summary: Summary,
+    summary: Rc<RefCell<Summary>>,
     visitor: ReportVisitor,
 }
 
 impl TestSuiteVisitor {
-    pub fn summary(&self) -> Summary {
-        self.summary.clone()
-    }
     pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
         let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
-        let summary = Summary::empty();
+        let summary = Rc::new(RefCell::new(Summary::empty()));
         Ok(TestSuiteVisitor { visitor, summary })
     }
 }
@@ -397,7 +395,8 @@ impl Iterator for TestSuiteVisitor {
             "Couldn't parse junit TestSuite from XML report {}",
             display_path
         ));
-        self.summary.inc(&suite);
+        let mut summary = self.summary.borrow_mut();
+        summary.inc(&suite);
         Some(suite)
     }
 }
