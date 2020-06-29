@@ -1,34 +1,10 @@
 use crate::config::Config;
+use anyhow::Result;
 use chrono::{Duration, NaiveDateTime};
-use glob::{glob_with, MatchOptions};
-use log::debug;
+use fs::TestSuiteVisitor;
 use serde::{Deserialize, Deserializer};
-use std::fs;
 use std::io;
-use std::{
-    cell::RefCell,
-    env,
-    ffi::OsStr,
-    path::{Path, PathBuf},
-    rc::Rc,
-    str::FromStr,
-};
-use structopt::StructOpt;
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum JunitError {
-    #[error("The supplied input was not well formatted XML")]
-    UnparsableXML(#[from] serde_xml_rs::Error),
-    #[error("An IO error occurred")]
-    IoErr(#[from] std::io::Error),
-    #[error("Internal error: {0}")]
-    InternalError(String),
-    #[error("Invalid report dir pattern")]
-    InvalidReportDirPattern(#[from] glob::PatternError),
-}
-
-pub type Result<T> = std::result::Result<T, JunitError>;
+use std::{env, path::PathBuf};
 
 fn f32_to_duration<'de, D>(deserializer: D) -> std::result::Result<Duration, D::Error>
 where
@@ -166,7 +142,8 @@ impl Summary {
         self.failures += suite.failures;
         self.skipped += suite.skipped();
     }
-    fn empty() -> Self {
+
+    fn zero() -> Self {
         Summary {
             total_time: Duration::zero(),
             tests: 0,
@@ -187,48 +164,6 @@ pub trait HasOutcome {
     fn outcome(&self) -> TestOutcome;
 }
 
-#[derive(Debug, PartialEq, StructOpt)]
-pub enum SortingOrder {
-    Asc,
-    Desc,
-}
-
-impl FromStr for SortingOrder {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match &*s.to_uppercase() {
-            "ASC" => Ok(SortingOrder::Asc),
-            "DESC" => Ok(SortingOrder::Desc),
-            _ => Err(anyhow::Error::msg(format!(
-                "Cannot parse `SortingOrder`, invalid token {}",
-                s
-            ))),
-        }
-    }
-}
-
-#[derive(Debug, StructOpt)]
-pub enum ReportSorting {
-    Time(SortingOrder),
-}
-impl FromStr for ReportSorting {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let chunks: Vec<&str> = s.split(" ").take(2).collect();
-        if chunks.len() == 1 && chunks[0].to_lowercase() == "time" {
-            Ok(ReportSorting::Time(SortingOrder::Desc))
-        } else if chunks.len() == 2 && chunks[0].to_lowercase() == "time" {
-            let order = SortingOrder::from_str(chunks[1])?;
-            Ok(ReportSorting::Time(order))
-        } else {
-            Err(anyhow::Error::msg(format!(
-                "Cannot parse `SortingOrder`, invalid token {}",
-                s
-            )))
-        }
-    }
-}
-
 pub fn read_testsuites(
     project_dir: Option<PathBuf>,
     config: &Config,
@@ -236,10 +171,13 @@ pub fn read_testsuites(
 ) -> anyhow::Result<(Vec<TestSuite>, Summary)> {
     let current_dir = env::current_dir()?;
     let project_dir = project_dir.unwrap_or_else(|| current_dir);
-    let visitor = TestSuiteVisitor::from_basedir(project_dir, &config.junit.report_dir_pattern)?;
-    let summary_rc = visitor.summary.clone();
+    let mut summary = Summary::zero();
+    let visitor = TestSuiteVisitor::from_basedir(
+        project_dir,
+        &config.junit.report_dir_pattern,
+        &mut summary,
+    )?;
     let mut test_suites: Vec<TestSuite> = visitor.collect();
-    let summary = summary_rc.as_ref().borrow();
     if let Some(ReportSorting::Time(order)) = sort_by {
         test_suites.sort_by(|a, b| {
             if order == SortingOrder::Asc {
@@ -249,7 +187,7 @@ pub fn read_testsuites(
             }
         })
     }
-    Ok((test_suites, summary.clone()))
+    Ok((test_suites, summary))
 }
 
 pub enum TestSuitesOutcome {
@@ -317,92 +255,7 @@ fn read_suite<R: io::Read>(input: R) -> Result<TestSuite> {
     Ok(suite)
 }
 
-pub struct ReportVisitor {
-    report_files: Vec<PathBuf>,
-    position: usize,
-}
-
-impl ReportVisitor {
-    pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
-        let mut report_files: Vec<PathBuf> = Vec::new();
-        let prefixed_dir_pattern =
-            vec![base_dir.as_ref().to_str().unwrap(), report_dir_pattern].join("/");
-
-        let paths = glob_with(
-            &prefixed_dir_pattern,
-            MatchOptions {
-                case_sensitive: true,
-                require_literal_separator: true,
-                require_literal_leading_dot: true,
-            },
-        )?;
-
-        for path in paths {
-            if let Ok(path) = path {
-                if path.is_dir() {
-                    for entry in fs::read_dir(path)? {
-                        if let Ok(file) = entry {
-                            if file.path().extension() == Some(OsStr::new("xml")) {
-                                report_files.push(file.path());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        debug!("{} report files found", report_files.len());
-
-        Ok(ReportVisitor {
-            report_files,
-            position: 0,
-        })
-    }
-}
-impl Iterator for ReportVisitor {
-    type Item = PathBuf;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.position >= self.report_files.len() {
-            None
-        } else {
-            let item = self.report_files[self.position].to_owned();
-            self.position += 1;
-            Some(item)
-        }
-    }
-}
-
-pub struct TestSuiteVisitor {
-    summary: Rc<RefCell<Summary>>,
-    visitor: ReportVisitor,
-}
-
-impl TestSuiteVisitor {
-    pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
-        let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
-        let summary = Rc::new(RefCell::new(Summary::empty()));
-        Ok(TestSuiteVisitor { visitor, summary })
-    }
-}
-impl Iterator for TestSuiteVisitor {
-    type Item = TestSuite;
-    fn next(&mut self) -> Option<Self::Item> {
-        let path = self.visitor.next()?;
-        let display_path = path.display();
-        let file = fs::File::open(path.clone())
-            .expect(&format!("Couldn't open report file: {}", display_path));
-        let suite = read_suite(file).expect(&format!(
-            "Couldn't parse junit TestSuite from XML report {}",
-            display_path
-        ));
-        let mut summary = self.summary.borrow_mut();
-        summary.inc(&suite);
-        Some(suite)
-    }
-}
-
 #[cfg(test)]
-
 mod tests {
     extern crate pretty_assertions;
     extern crate uuid;
@@ -411,7 +264,7 @@ mod tests {
     use chrono::NaiveDate;
     use pretty_assertions::assert_eq;
     use serde_xml_rs::from_reader;
-    use std::env;
+    use std::{env, path::Path};
     use uuid::Uuid;
 
     const SUCCESS_TESTSUITE_XML: &str = r##"
@@ -533,8 +386,9 @@ com.example
         let base_dir = dir.as_path();
 
         create_report_dir(base_dir, "testreports", 3, 3, 7).expect("Couldn't setup test data");
+        let mut summary = Summary::zero();
 
-        let visitor = TestSuiteVisitor::from_basedir(base_dir, report_dir_pattern)
+        let visitor = TestSuiteVisitor::from_basedir(base_dir, report_dir_pattern, &mut summary)
             .expect("Couldn't initialize visitor");
 
         for test_suite in visitor {
@@ -559,20 +413,20 @@ com.example
             reports_path.push(n.to_string())
         }
         reports_path.push(report_dirname);
-        fs::create_dir_all(reports_path.to_owned())?;
+        std::fs::create_dir_all(reports_path.to_owned())?;
 
         //create successfull report files
         for n in 0..successful {
             let mut report_path = PathBuf::from(reports_path.to_owned());
             report_path.push(format!("{}.xml", n));
-            fs::write(report_path, SUCCESS_TESTSUITE_XML)?;
+            std::fs::write(report_path, SUCCESS_TESTSUITE_XML)?;
         }
 
         //create failed report files
         for n in successful..(failed + successful) {
             let mut report_path = PathBuf::from(reports_path.to_owned());
             report_path.push(format!("{}.xml", n));
-            fs::write(report_path, FAILED_TESTSUITE_XML)?;
+            std::fs::write(report_path, FAILED_TESTSUITE_XML)?;
         }
 
         Ok(())
@@ -580,3 +434,8 @@ com.example
 }
 
 pub mod display;
+mod fs;
+
+mod cli;
+pub type ReportSorting = cli::ReportSorting;
+pub type SortingOrder = cli::SortingOrder;
