@@ -1,4 +1,5 @@
 extern crate anyhow;
+extern crate atty;
 extern crate chrono;
 extern crate colored;
 extern crate glob;

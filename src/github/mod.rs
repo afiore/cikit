@@ -49,7 +49,6 @@ mod tests {
     extern crate pretty_assertions;
 
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn deserialize_from_github_event() {

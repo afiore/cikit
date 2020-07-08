@@ -94,6 +94,7 @@ name = "cikit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "atty",
  "chrono",
  "colored",
  "env_logger",
