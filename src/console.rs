@@ -1,5 +1,5 @@
 use crate::junit::{HasOutcome, TestOutcome};
-use colored::{ColoredString, Colorize};
+use colored::{Color, ColoredString, Colorize};
 use io::Result;
 use std::io;
 
@@ -7,6 +7,13 @@ use crate::{junit::*, notify::Notifier};
 
 const INDENT_STR: &str = " ";
 
+fn color_if_pos<S: Into<Color>>(value: usize, color: S) -> ColoredString {
+    if value > 0 {
+        value.to_string().color(color)
+    } else {
+        value.to_string().normal()
+    }
+}
 pub trait ConsoleDisplay {
     fn display(&self, f: &mut Box<dyn io::Write>, depth: usize) -> Result<()>;
 }
@@ -15,15 +22,29 @@ impl ConsoleDisplay for Summary {
     fn display(&self, f: &mut Box<dyn io::Write>, _depth: usize) -> Result<()> {
         writeln!(
             f,
-            "> {:<20}:{}",
+            "> {:<11}:{}",
             "Duration",
             display::duration(self.total_time.to_std().unwrap())
         )?;
-        writeln!(f, "> {:<20}:{:<4}", "Tests run", self.tests)?;
-        writeln!(f, "> {:<20}:{:<4}", "Falures", self.failures)?;
-        writeln!(f, "> {:<20}:{:<4}", "Errors", self.errors)?;
-        writeln!(f, "> {:<20}:{:<4}", "Skipped", self.errors)?;
-        writeln!(f, "")
+        writeln!(f, "> {:<11}:{:<4}", "Tests run", self.tests)?;
+        writeln!(
+            f,
+            "> {:<11}:{:<4}",
+            "Falures",
+            color_if_pos(self.failures, Color::Red)
+        )?;
+        writeln!(
+            f,
+            "> {:<11}:{:<4}",
+            "Errors",
+            color_if_pos(self.errors, Color::Red)
+        )?;
+        writeln!(
+            f,
+            "> {:<11}:{:<4}",
+            "Skipped",
+            color_if_pos(self.errors, Color::Blue)
+        )
     }
 }
 

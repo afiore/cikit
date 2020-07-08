@@ -1,12 +1,17 @@
 use super::{read_suite, Summary, TestSuite};
+use crate::console::ConsoleDisplay;
 use anyhow::Result;
+use atty::Stream;
 use glob::{glob_with, MatchOptions};
 use log::debug;
 use std::{
     ffi::OsStr,
-    fs,
+    fs, io,
     path::{Path, PathBuf},
 };
+
+const SUMMARY_CURSOR_UP: &str = "\x1b[5A";
+const SUMMARY_CURSOR_DOWN: &str = "\x1b[5B";
 
 struct ReportVisitor {
     report_files: Vec<PathBuf>,
@@ -66,6 +71,8 @@ impl Iterator for ReportVisitor {
 pub(super) struct TestSuiteVisitor<'s> {
     summary: &'s mut Summary,
     visitor: ReportVisitor,
+    display_progress: bool,
+    sink: Box<dyn io::Write>,
 }
 
 impl<'s> TestSuiteVisitor<'s> {
@@ -75,21 +82,47 @@ impl<'s> TestSuiteVisitor<'s> {
         summary: &'s mut Summary,
     ) -> Result<Self> {
         let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
-        Ok(TestSuiteVisitor { visitor, summary })
+        let display_progress = atty::is(Stream::Stdout);
+        let sink = Box::new(io::stdout());
+        Ok(TestSuiteVisitor {
+            visitor,
+            summary,
+            display_progress,
+            sink,
+        })
+    }
+
+    fn progress_update(&mut self) {
+        if self.display_progress {
+            self.summary.display(&mut self.sink, 0).unwrap();
+            write!(&mut self.sink, "\r{}", SUMMARY_CURSOR_UP).unwrap();
+        } else {
+            ()
+        }
+    }
+    fn end_progress_update(&mut self) {
+        if self.display_progress {
+            writeln!(&mut self.sink, "{}", SUMMARY_CURSOR_DOWN).unwrap();
+        }
     }
 }
 impl<'s> Iterator for TestSuiteVisitor<'s> {
     type Item = TestSuite;
     fn next(&mut self) -> Option<Self::Item> {
-        let path = self.visitor.next()?;
-        let display_path = path.display();
-        let file = fs::File::open(path.clone())
-            .expect(&format!("Couldn't open report file: {}", display_path));
-        let suite = read_suite(file).expect(&format!(
-            "Couldn't parse junit TestSuite from XML report {}",
-            display_path
-        ));
-        self.summary.inc(&suite);
-        Some(suite)
+        if let Some(path) = self.visitor.next() {
+            let display_path = path.display();
+            let file = fs::File::open(path.clone())
+                .expect(&format!("Couldn't open report file: {}", display_path));
+            let suite = read_suite(file).expect(&format!(
+                "Couldn't parse junit TestSuite from XML report {}",
+                display_path
+            ));
+            self.summary.inc(&suite);
+            self.progress_update();
+            Some(suite)
+        } else {
+            self.end_progress_update();
+            None
+        }
     }
 }

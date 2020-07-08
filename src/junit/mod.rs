@@ -122,7 +122,7 @@ pub struct FailedTestCase {
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct TestSkipped {}
 
-#[derive(Clone)]
+#[derive(Debug)]
 pub struct Summary {
     pub total_time: Duration,
     pub tests: usize,
