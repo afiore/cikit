@@ -26,6 +26,15 @@ where
         .map_err(|_| Error::custom("Cannot convert to std duration"))?;
     s.serialize_f32(std_duration.as_secs_f32())
 }
+fn testskipped_to_boolean<S>(
+    skipped: &Option<TestSkipped>,
+    s: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_bool(skipped.is_some())
+}
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct TestSuite {
@@ -96,6 +105,7 @@ pub struct TestCase {
     )]
     pub time: Duration,
     pub failure: Option<TestFailure>,
+    #[serde(serialize_with = "testskipped_to_boolean")]
     skipped: Option<TestSkipped>,
 }
 impl TestCase {

@@ -73,7 +73,7 @@ fn main() -> anyhow::Result<()> {
         }
         Cmd::TestReport { sort_by, format } => {
             let (test_suites, summary) = junit::read_testsuites(opt.project_dir, &config, sort_by)?;
-            let mut notifier: Box<Notifier<CIContext = (), Event = (Summary, Vec<TestSuite>)>> =
+            let mut notifier: Box<dyn Notifier<CIContext = (), Event = (Summary, Vec<TestSuite>)>> =
                 match format {
                     Format::Text => Box::new(ConsoleTextNotifier::stdout()),
                     Format::Json => Box::new(ConsoleJsonNotifier::stdout(false)),

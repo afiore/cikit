@@ -145,11 +145,25 @@ impl Notifier for ConsoleJsonNotifier {
 
     fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
         let (summary, test_suites) = event;
+        let mut successful: Vec<TestSuite> = Vec::new();
+        let mut failed: Vec<FailedTestSuite> = Vec::new();
+
+        for suite in test_suites {
+            if suite.is_successful() {
+                successful.push(suite)
+            } else {
+                if let Some(suite) = suite.as_failed() {
+                    failed.push(suite);
+                }
+            }
+        }
+
         let full_report = FullReport {
             summary,
-            successful: test_suites,
-            failed: vec![],
+            successful,
+            failed,
         };
+
         if self.compact {
             serde_json::ser::to_writer(&mut self.sink, &full_report)?;
         } else {
