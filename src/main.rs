@@ -14,18 +14,18 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 enum Format {
     Text,
-    Json, // Json {
-          //     #[structopt(short, long, help = "do not pretty print json")]
-          //     compact: bool,
-          // },
-          // Html {
-          //     #[structopt(
-          //         short,
-          //         long,
-          //         help = "output directory of the HTML report. Defaults to 'report'"
-          //     )]
-          //     output_dir: Option<PathBuf>,
-          // }
+    Json {
+        #[structopt(short, long, help = "do not pretty print json")]
+        compact: bool,
+    },
+    // Html {
+    //     #[structopt(
+    //         short,
+    //         long,
+    //         help = "output directory of the HTML report. Defaults to 'report'"
+    //     )]
+    //     output_dir: Option<PathBuf>,
+    // }
 }
 
 impl Default for Format {
@@ -76,7 +76,7 @@ fn main() -> anyhow::Result<()> {
             let mut notifier: Box<dyn Notifier<CIContext = (), Event = (Summary, Vec<TestSuite>)>> =
                 match format {
                     Format::Text => Box::new(ConsoleTextNotifier::stdout()),
-                    Format::Json => Box::new(ConsoleJsonNotifier::stdout(false)),
+                    Format::Json { compact } => Box::new(ConsoleJsonNotifier::stdout(compact)),
                     // Format::Html { output_dir: _ } => todo!(),
                 };
             notifier.notify((summary, test_suites), ())
