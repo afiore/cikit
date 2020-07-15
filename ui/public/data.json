@@ -1,0 +1,696 @@
+{
+  "successful": [
+    {
+      "name": "io.lenses.config.ServiceMetricsConfigTest",
+      "tests": 6,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.302,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "return none if jmx or metrics is not present",
+          "classname": "io.lenses.config.ServiceMetricsConfigTest",
+          "time": 0.255,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "return the jmx metrics based on the old format",
+          "classname": "io.lenses.config.ServiceMetricsConfigTest",
+          "time": 0.017,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "return the jmx metrics with user and password and ssl",
+          "classname": "io.lenses.config.ServiceMetricsConfigTest",
+          "time": 0.019,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "return the jmx metrics with user with no password and ssl",
+          "classname": "io.lenses.config.ServiceMetricsConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "return the http metrics with user and password and ssl",
+          "classname": "io.lenses.config.ServiceMetricsConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "raise an error when using http type and the url does not start with http/https",
+          "classname": "io.lenses.config.ServiceMetricsConfigTest",
+          "time": 0.009,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.util.PluginConfigSpec",
+      "tests": 8,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.33,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "loadPlugin should succeed for valid class instance",
+          "classname": "io.lenses.config.util.PluginConfigSpec",
+          "time": 0.259,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "loadPlugin should fail when it is not defined in config",
+          "classname": "io.lenses.config.util.PluginConfigSpec",
+          "time": 0.004,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "loadPlugin should fail when class cannot be found",
+          "classname": "io.lenses.config.util.PluginConfigSpec",
+          "time": 0.013,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "loadPlugin should fail when class has invalid type",
+          "classname": "io.lenses.config.util.PluginConfigSpec",
+          "time": 0.004,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "loadOptionalPlugin should succeed for valid class instance",
+          "classname": "io.lenses.config.util.PluginConfigSpec",
+          "time": 0.022,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "loadOptionalPlugin should return no instance when it is not defined in config",
+          "classname": "io.lenses.config.util.PluginConfigSpec",
+          "time": 0.014,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "loadOptionalPlugin should fail when class cannot be found",
+          "classname": "io.lenses.config.util.PluginConfigSpec",
+          "time": 0.002,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "loadOptionalPlugin should fail when class has invalid type",
+          "classname": "io.lenses.config.util.PluginConfigSpec",
+          "time": 0.012,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.domain.telemetry.LensesTelemetryTest",
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 5.525,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "LensesTelemetry should assemble from initial data correctly",
+          "classname": "io.lenses.domain.telemetry.LensesTelemetryTest",
+          "time": 5.525,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.SQLConfigTest",
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.269,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "loads the SQL configuration",
+          "classname": "io.lenses.config.SQLConfigTest",
+          "time": 0.269,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.KafkaConfigTest",
+      "tests": 3,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.464,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "client",
+          "classname": "io.lenses.config.KafkaConfigTest",
+          "time": 0.458,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "amalgamate data from producer and consumer if client is not present",
+          "classname": "io.lenses.config.KafkaConfigTest",
+          "time": 0.003,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "throw exception if producer/consumer are present alongside client",
+          "classname": "io.lenses.config.KafkaConfigTest",
+          "time": 0.003,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.validation.ValidateFileAccessTest",
+      "tests": 3,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.072,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "raises an exception if the file given is not found",
+          "classname": "io.lenses.config.validation.ValidateFileAccessTest",
+          "time": 0.07,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "read a text file and not raise an exception",
+          "classname": "io.lenses.config.validation.ValidateFileAccessTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "read a binary file and not raise an exception",
+          "classname": "io.lenses.config.validation.ValidateFileAccessTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.ConfigExtensionSpec",
+      "tests": 4,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.726,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "readFlatMap should transform all configured values to strings",
+          "classname": "io.lenses.config.ConfigExtensionSpec",
+          "time": 0.718,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "readFlatMap should return default for missing config",
+          "classname": "io.lenses.config.ConfigExtensionSpec",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "WrongType for invalid config type",
+          "classname": "io.lenses.config.ConfigExtensionSpec",
+          "time": 0.006,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "readFlatMap should flatten config with deeper structure into string",
+          "classname": "io.lenses.config.ConfigExtensionSpec",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.DefaultTestConfigTest",
+      "tests": 20,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 1.169,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "LensesConfig should read kafka brokers AWS config",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.891,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should read the config",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.022,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "conf",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.049,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should read connect config with JMX",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should read connect config with HTTP",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should read connect config with basic auth",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.004,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should reject connect config for missing topic",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.002,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should reject connect config for a connector sharing a topic",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should should read username and password for schema registry",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.002,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should should read schema registry with no creds",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should should read schema registry with no creds and custom settings",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should should read schema registry with schema registry mode set to hortonworks",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.002,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should should create k8 config with sasl",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.0,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should reads the config without temp audits topic",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.019,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesConfig should reads the config with temp audits topic",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.169,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesRuntime should read runtime configuration with API cache disabled",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesRuntime should read runtime configuration with API cache enabled",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesRuntime should default to cache enabled",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.0,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesRuntime should default to not hide services endpoint",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "LensesRuntime should read runtime configuration with sercices endpoints",
+          "classname": "io.lenses.config.DefaultTestConfigTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.domain.zookeeper.ZKSpec",
+      "tests": 0,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.0,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": []
+    },
+    {
+      "name": "io.lenses.config.kafka.connect.FtpTopicsExtractorTest",
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.055,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "FtpTopicsExtractor should extract tailing topics from config",
+          "classname": "io.lenses.config.kafka.connect.FtpTopicsExtractorTest",
+          "time": 0.055,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.domain.metrics.SlidingTimeMeterLongTest",
+      "tests": 3,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 3,
+      "time": 0.003,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "SlidingTimeMeter should return the values for the time window",
+          "classname": "io.lenses.domain.metrics.SlidingTimeMeterLongTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": true
+        },
+        {
+          "name": "SlidingTimeMeter should evict values after the window is gone",
+          "classname": "io.lenses.domain.metrics.SlidingTimeMeterLongTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": true
+        },
+        {
+          "name": "SlidingTimeMeter should calculate the average",
+          "classname": "io.lenses.domain.metrics.SlidingTimeMeterLongTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": true
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.DynamicConfigTest",
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.262,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "DynamicConfig should load from config",
+          "classname": "io.lenses.config.DynamicConfigTest",
+          "time": 0.262,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.LensesSSLTest",
+      "tests": 9,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.513,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "returns none if the ssl configs are not there",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.21,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "returns the fully configured SSL",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.293,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "raise an exception if the keystore file does not exist",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.002,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "raises an exception if the keystore password does not exist",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.003,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "raises an exception if the key password is not provided",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "auth is set to true but no truststore is supplied",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.003,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "defaults the enabled protocols",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.0,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "defaults the algorithm",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.0,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "defaults the cypher suites",
+          "classname": "io.lenses.config.LensesSSLTest",
+          "time": 0.001,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.domain.sql.runner.ConnectSqlRunnerTest",
+      "tests": 2,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.05,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "ConnectSqlRunner:mapToJson handles empty input",
+          "classname": "io.lenses.domain.sql.runner.ConnectSqlRunnerTest",
+          "time": 0.048,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "ConnectSqlRunner:mapToJson converts a simple key->value structure",
+          "classname": "io.lenses.domain.sql.runner.ConnectSqlRunnerTest",
+          "time": 0.002,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.ExternalServiceConfigTest",
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.356,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "handle reading kafka settings for processors",
+          "classname": "io.lenses.config.ExternalServiceConfigTest",
+          "time": 0.356,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.ConnectorInfoTest",
+      "tests": 2,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.116,
+      "timestamp": "2020-07-15T08:56:12",
+      "testcase": [
+        {
+          "name": "ConnectorInfo should read from config",
+          "classname": "io.lenses.config.ConnectorInfoTest",
+          "time": 0.109,
+          "failure": null,
+          "skipped": false
+        },
+        {
+          "name": "ConnectorInfo should throw exception because the extractor is not inheriting from TopicsExtractor",
+          "classname": "io.lenses.config.ConnectorInfoTest",
+          "time": 0.007,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.kafka.connect.KcqlInsertTopicsExtractorTest",
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.053,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "KcqlInsertTopicsExtractor should extract the INSERT 'topicXX' from config",
+          "classname": "io.lenses.config.kafka.connect.KcqlInsertTopicsExtractorTest",
+          "time": 0.053,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "io.lenses.config.kafka.connect.SimpleTopicsExtractorTest",
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "time": 0.05,
+      "timestamp": "2020-07-15T08:56:11",
+      "testcase": [
+        {
+          "name": "SimpleTopicsExtractor should extract tailing topics from config",
+          "classname": "io.lenses.config.kafka.connect.SimpleTopicsExtractorTest",
+          "time": 0.05,
+          "failure": null,
+          "skipped": false
+        }
+      ]
+    }
+  ],
+  "failed": [
+    {
+      "name": "io.lenses.domain.monitoring.AlertSettingSpec",
+      "time": 0.274,
+      "timestamp": "2020-07-15T08:56:11",
+      "failed_testcases": [
+        {
+          "name": "AlertSetting should have stable name (for use in telemetry)",
+          "classname": "io.lenses.domain.monitoring.AlertSettingSpec",
+          "time": 0.274,
+          "failure": {
+            "message": "\"LicenseStatus[]\" did not equal \"LicenseStatus[_blah]\"",
+            "type": "org.scalatest.exceptions.TestFailedException",
+            "$value": "org.scalatest.exceptions.TestFailedException: \"LicenseStatus[]\" did not equal \"LicenseStatus[_blah]\"\n\tat org.scalatest.matchers.MatchersHelper$.indicateFailure(MatchersHelper.scala:344)\n\tat org.scalatest.matchers.should.Matchers$AnyShouldWrapper.shouldEqual(Matchers.scala:6860)\n\tat io.lenses.domain.monitoring.AlertSettingSpec.$anonfun$new$4(AlertSettingSpec.scala:40)\n\tat scala.collection.Iterator.foreach(Iterator.scala:941)\n\tat scala.collection.Iterator.foreach$(Iterator.scala:941)\n\tat scala.collection.AbstractIterator.foreach(Iterator.scala:1429)\n\tat scala.collection.IterableLike.foreach(IterableLike.scala:74)\n\tat scala.collection.IterableLike.foreach$(IterableLike.scala:73)\n\tat scala.collection.AbstractIterable.foreach(Iterable.scala:56)\n\tat io.lenses.domain.monitoring.AlertSettingSpec.$anonfun$new$2(AlertSettingSpec.scala:40)\n\tat scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.java:23)\n\tat org.scalatest.OutcomeOf.outcomeOf(OutcomeOf.scala:85)\n\tat org.scalatest.OutcomeOf.outcomeOf$(OutcomeOf.scala:83)\n\tat org.scalatest.OutcomeOf$.outcomeOf(OutcomeOf.scala:104)\n\tat org.scalatest.Transformer.apply(Transformer.scala:22)\n\tat org.scalatest.Transformer.apply(Transformer.scala:20)\n\tat org.scalatest.wordspec.AnyWordSpecLike$$anon$3.apply(AnyWordSpecLike.scala:1076)\n\tat org.scalatest.TestSuite.withFixture(TestSuite.scala:196)\n\tat org.scalatest.TestSuite.withFixture$(TestSuite.scala:195)\n\tat org.scalatest.wordspec.AnyWordSpec.withFixture(AnyWordSpec.scala:1879)\n\tat org.scalatest.wordspec.AnyWordSpecLike.invokeWithFixture$1(AnyWordSpecLike.scala:1074)\n\tat org.scalatest.wordspec.AnyWordSpecLike.$anonfun$runTest$1(AnyWordSpecLike.scala:1086)\n\tat org.scalatest.SuperEngine.runTestImpl(Engine.scala:306)\n\tat org.scalatest.wordspec.AnyWordSpecLike.runTest(AnyWordSpecLike.scala:1086)\n\tat org.scalatest.wordspec.AnyWordSpecLike.runTest$(AnyWordSpecLike.scala:1068)\n\tat org.scalatest.wordspec.AnyWordSpec.runTest(AnyWordSpec.scala:1879)\n\tat org.scalatest.wordspec.AnyWordSpecLike.$anonfun$runTests$1(AnyWordSpecLike.scala:1145)\n\tat org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:413)\n\tat scala.collection.immutable.List.foreach(List.scala:392)\n\tat org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)\n\tat org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:390)\n\tat org.scalatest.SuperEngine.$anonfun$runTestsInBranch$1(Engine.scala:427)\n\tat scala.collection.immutable.List.foreach(List.scala:392)\n\tat org.scalatest.SuperEngine.traverseSubNodes$1(Engine.scala:401)\n\tat org.scalatest.SuperEngine.runTestsInBranch(Engine.scala:396)\n\tat org.scalatest.SuperEngine.runTestsImpl(Engine.scala:475)\n\tat org.scalatest.wordspec.AnyWordSpecLike.runTests(AnyWordSpecLike.scala:1145)\n\tat org.scalatest.wordspec.AnyWordSpecLike.runTests$(AnyWordSpecLike.scala:1144)\n\tat org.scalatest.wordspec.AnyWordSpec.runTests(AnyWordSpec.scala:1879)\n\tat org.scalatest.Suite.run(Suite.scala:1112)\n\tat org.scalatest.Suite.run$(Suite.scala:1094)\n\tat org.scalatest.wordspec.AnyWordSpec.org$scalatest$wordspec$AnyWordSpecLike$$super$run(AnyWordSpec.scala:1879)\n\tat org.scalatest.wordspec.AnyWordSpecLike.$anonfun$run$1(AnyWordSpecLike.scala:1190)\n\tat org.scalatest.SuperEngine.runImpl(Engine.scala:535)\n\tat org.scalatest.wordspec.AnyWordSpecLike.run(AnyWordSpecLike.scala:1190)\n\tat org.scalatest.wordspec.AnyWordSpecLike.run$(AnyWordSpecLike.scala:1188)\n\tat org.scalatest.wordspec.AnyWordSpec.run(AnyWordSpec.scala:1879)\n\tat org.scalatest.tools.Framework.org$scalatest$tools$Framework$$runSuite(Framework.scala:318)\n\tat org.scalatest.tools.Framework$ScalaTestTask.execute(Framework.scala:513)\n\tat sbt.TestRunner.runTest$1(TestFramework.scala:139)\n\tat sbt.TestRunner.run(TestFramework.scala:154)\n\tat sbt.TestFramework$$anon$3$$anonfun$$lessinit$greater$1.$anonfun$apply$1(TestFramework.scala:317)\n\tat sbt.TestFramework$.sbt$TestFramework$$withContextLoader(TestFramework.scala:277)\n\tat sbt.TestFramework$$anon$3$$anonfun$$lessinit$greater$1.apply(TestFramework.scala:317)\n\tat sbt.TestFramework$$anon$3$$anonfun$$lessinit$greater$1.apply(TestFramework.scala:317)\n\tat sbt.TestFunction.apply(TestFramework.scala:329)\n\tat sbt.Tests$.$anonfun$toTask$1(Tests.scala:311)\n\tat sbt.std.Transform$$anon$3.$anonfun$apply$2(Transform.scala:46)\n\tat sbt.std.Transform$$anon$4.work(Transform.scala:67)\n\tat sbt.Execute.$anonfun$submit$2(Execute.scala:281)\n\tat sbt.internal.util.ErrorHandling$.wideConvert(ErrorHandling.scala:19)\n\tat sbt.Execute.work(Execute.scala:290)\n\tat sbt.Execute.$anonfun$submit$1(Execute.scala:281)\n\tat sbt.ConcurrentRestrictions$$anon$4.$anonfun$submitValid$1(ConcurrentRestrictions.scala:178)\n\tat sbt.CompletionService$$anon$2.call(CompletionService.scala:37)\n\tat java.util.concurrent.FutureTask.run(FutureTask.java:266)\n\tat java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:511)\n\tat java.util.concurrent.FutureTask.run(FutureTask.java:266)\n\tat java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)\n\tat java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)\n\tat java.lang.Thread.run(Thread.java:748)"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_time": 10.589001,
+    "tests": 68,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 3
+  }
+}
