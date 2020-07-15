@@ -2,7 +2,7 @@ use crate::config::Config;
 use anyhow::Result;
 use chrono::{Duration, NaiveDateTime};
 use fs::TestSuiteVisitor;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::io;
 use std::{env, path::PathBuf};
 
@@ -16,14 +16,28 @@ where
         .map_err(|_| Error::custom("Cannot parse duration"))
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+fn duration_to_f32<S>(duration: &Duration, s: S) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    use serde::ser::Error;
+    let std_duration = duration
+        .to_std()
+        .map_err(|_| Error::custom("Cannot convert to std duration"))?;
+    s.serialize_f32(std_duration.as_secs_f32())
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct TestSuite {
     pub name: String,
     pub tests: usize,
     pub errors: usize,
     pub failures: usize,
     pub skipped: Option<usize>,
-    #[serde(deserialize_with = "f32_to_duration")]
+    #[serde(
+        deserialize_with = "f32_to_duration",
+        serialize_with = "duration_to_f32"
+    )]
     pub time: Duration,
     pub timestamp: NaiveDateTime,
     #[serde(rename = "testcase", default)]
@@ -72,11 +86,14 @@ impl HasOutcome for TestSuite {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct TestCase {
     pub name: String,
     pub classname: String,
-    #[serde(deserialize_with = "f32_to_duration")]
+    #[serde(
+        deserialize_with = "f32_to_duration",
+        serialize_with = "duration_to_f32"
+    )]
     pub time: Duration,
     pub failure: Option<TestFailure>,
     skipped: Option<TestSkipped>,
@@ -112,18 +129,23 @@ impl HasOutcome for TestCase {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct FailedTestCase {
     pub name: String,
     pub classname: String,
+    #[serde(serialize_with = "duration_to_f32")]
     pub time: Duration,
     pub failure: TestFailure,
 }
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct TestSkipped {}
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Summary {
+    #[serde(
+        deserialize_with = "f32_to_duration",
+        serialize_with = "duration_to_f32"
+    )]
     pub total_time: Duration,
     pub tests: usize,
     pub failures: usize,
@@ -233,7 +255,14 @@ impl TestSuitesOutcome {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, Serialize)]
+pub struct FullReport {
+    pub successful: Vec<TestSuite>,
+    pub failed: Vec<FailedTestSuite>,
+    pub summary: Summary,
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct TestFailure {
     pub message: String,
     #[serde(rename = "type")]
@@ -242,9 +271,10 @@ pub struct TestFailure {
     pub stack_trace: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct FailedTestSuite {
     pub name: String,
+    #[serde(serialize_with = "duration_to_f32")]
     pub time: Duration,
     pub timestamp: NaiveDateTime,
     pub failed_testcases: Vec<FailedTestCase>,

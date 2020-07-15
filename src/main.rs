@@ -1,12 +1,38 @@
 use cikit::config::Config;
 use cikit::junit;
 use cikit::{
-    console::ConsoleNotifier, github::GithubContext, notify::Notifier, slack::SlackNotifier,
+    console::{ConsoleJsonNotifier, ConsoleTextNotifier},
+    github::GithubContext,
+    notify::Notifier,
+    slack::SlackNotifier,
 };
 
-use junit::{ReportSorting, TestSuitesOutcome};
+use junit::{ReportSorting, Summary, TestSuite, TestSuitesOutcome};
 use std::path::PathBuf;
 use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+enum Format {
+    Text,
+    Json, // Json {
+          //     #[structopt(short, long, help = "do not pretty print json")]
+          //     compact: bool,
+          // },
+          // Html {
+          //     #[structopt(
+          //         short,
+          //         long,
+          //         help = "output directory of the HTML report. Defaults to 'report'"
+          //     )]
+          //     output_dir: Option<PathBuf>,
+          // }
+}
+
+impl Default for Format {
+    fn default() -> Self {
+        Format::Text
+    }
+}
 
 #[derive(Debug, StructOpt)]
 enum Cmd {
@@ -16,6 +42,8 @@ enum Cmd {
     TestReport {
         #[structopt(short, long, help = "time [ASC|DESC]")]
         sort_by: Option<ReportSorting>,
+        #[structopt(subcommand)]
+        format: Format,
     },
 }
 
@@ -43,10 +71,15 @@ fn main() -> anyhow::Result<()> {
             let mut notifier = SlackNotifier::new(config.notifications);
             notifier.notify(outcome, ctx)
         }
-        Cmd::TestReport { sort_by } => {
+        Cmd::TestReport { sort_by, format } => {
             let (test_suites, summary) = junit::read_testsuites(opt.project_dir, &config, sort_by)?;
-            let mut console_notifier = ConsoleNotifier::stdout();
-            console_notifier.notify((summary, test_suites), ())
+            let mut notifier: Box<Notifier<CIContext = (), Event = (Summary, Vec<TestSuite>)>> =
+                match format {
+                    Format::Text => Box::new(ConsoleTextNotifier::stdout()),
+                    Format::Json => Box::new(ConsoleJsonNotifier::stdout(false)),
+                    // Format::Html { output_dir: _ } => todo!(),
+                };
+            notifier.notify((summary, test_suites), ())
         }
     }
 }

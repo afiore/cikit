@@ -1,4 +1,4 @@
-use crate::junit::{HasOutcome, TestOutcome};
+use crate::junit::{FullReport, HasOutcome, TestOutcome};
 use colored::{Color, ColoredString, Colorize};
 use io::Result;
 use std::io;
@@ -102,25 +102,58 @@ impl ConsoleDisplay for TestSuite {
     }
 }
 
-pub struct ConsoleNotifier {
+pub struct ConsoleTextNotifier {
     sink: Box<dyn io::Write>,
 }
-impl ConsoleNotifier {
+impl ConsoleTextNotifier {
     fn sink_to(sink: Box<dyn io::Write>) -> Self {
-        ConsoleNotifier { sink }
+        ConsoleTextNotifier { sink }
     }
-
     pub fn stdout() -> Self {
-        ConsoleNotifier::sink_to(Box::new(io::stdout()))
+        ConsoleTextNotifier::sink_to(Box::new(io::stdout()))
     }
 }
-impl Notifier for ConsoleNotifier {
+
+impl Notifier for ConsoleTextNotifier {
     type Event = (Summary, Vec<TestSuite>);
     type CIContext = ();
     fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
         event.0.display(&mut self.sink, 0)?;
         for suite in &event.1 {
             suite.display(&mut self.sink, 0)?;
+        }
+        Ok(())
+    }
+}
+
+pub struct ConsoleJsonNotifier {
+    compact: bool,
+    sink: Box<dyn io::Write>,
+}
+impl ConsoleJsonNotifier {
+    fn sink_to(compact: bool, sink: Box<dyn io::Write>) -> Self {
+        ConsoleJsonNotifier { compact, sink }
+    }
+    pub fn stdout(compact: bool) -> Self {
+        ConsoleJsonNotifier::sink_to(compact, Box::new(io::stdout()))
+    }
+}
+
+impl Notifier for ConsoleJsonNotifier {
+    type Event = (Summary, Vec<TestSuite>);
+    type CIContext = ();
+
+    fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
+        let (summary, test_suites) = event;
+        let full_report = FullReport {
+            summary,
+            successful: test_suites,
+            failed: vec![],
+        };
+        if self.compact {
+            serde_json::ser::to_writer(&mut self.sink, &full_report)?;
+        } else {
+            serde_json::ser::to_writer_pretty(&mut self.sink, &full_report)?;
         }
         Ok(())
     }
