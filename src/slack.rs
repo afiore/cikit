@@ -4,7 +4,6 @@ use crate::junit::{self, FailedTestSuite, Summary, TestSuitesOutcome};
 use crate::notify::Notifier;
 use serde::Deserialize;
 
-
 use std::{fmt::Display, io::Read};
 
 use log::warn;
@@ -53,9 +52,7 @@ impl Block {
             text: Text::mrkdwn(headline),
             fields: vec![
                 Text::mrkdwn("*total_time*"),
-                Text::plain(
-                    &junit::display::duration(summary.total_time.to_std().unwrap()).to_string(),
-                ),
+                Text::plain(&junit::display::duration(summary.time.to_std().unwrap()).to_string()),
                 //
                 Text::mrkdwn("*tests*"),
                 Text::plain(&format!("{}", summary.tests)),

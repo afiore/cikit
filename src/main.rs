@@ -7,7 +7,7 @@ use cikit::{
     slack::SlackNotifier,
 };
 
-use junit::{ReportSorting, Summary, TestSuite, TestSuitesOutcome};
+use junit::{ReportSorting, Summary, SummaryWith, TestSuite, TestSuitesOutcome};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -73,12 +73,13 @@ fn main() -> anyhow::Result<()> {
         }
         Cmd::TestReport { sort_by, format } => {
             let (test_suites, summary) = junit::read_testsuites(opt.project_dir, &config, sort_by)?;
-            let mut notifier: Box<dyn Notifier<CIContext = (), Event = (Summary, Vec<TestSuite>)>> =
-                match format {
-                    Format::Text => Box::new(ConsoleTextNotifier::stdout()),
-                    Format::Json { compact } => Box::new(ConsoleJsonNotifier::stdout(compact)),
-                    // Format::Html { output_dir: _ } => todo!(),
-                };
+            let mut notifier: Box<
+                dyn Notifier<CIContext = (), Event = (Summary, Vec<SummaryWith<TestSuite>>)>,
+            > = match format {
+                Format::Text => Box::new(ConsoleTextNotifier::stdout()),
+                Format::Json { compact } => Box::new(ConsoleJsonNotifier::stdout(compact)),
+                // Format::Html { output_dir: _ } => todo!(),
+            };
             notifier.notify((summary, test_suites), ())
         }
     }

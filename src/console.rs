@@ -1,4 +1,4 @@
-use crate::junit::{FullReport, HasOutcome, TestOutcome};
+use crate::junit::{FullReport, TestOutcome};
 use colored::{Color, ColoredString, Colorize};
 use io::Result;
 use std::io;
@@ -24,7 +24,7 @@ impl ConsoleDisplay for Summary {
             f,
             "> {:<11}:{}",
             "Duration",
-            display::duration(self.total_time.to_std().unwrap())
+            display::duration(self.time.to_std().unwrap())
         )?;
         writeln!(f, "> {:<11}:{:<4}", "Tests run", self.tests)?;
         writeln!(
@@ -50,7 +50,16 @@ impl ConsoleDisplay for Summary {
 
 impl ConsoleDisplay for TestFailure {
     fn display(&self, f: &mut Box<dyn io::Write>, depth: usize) -> Result<()> {
-        writeln!(f, "{}-- {}", INDENT_STR.repeat(depth), self.message.red())
+        writeln!(
+            f,
+            "{}-- {}",
+            INDENT_STR.repeat(depth),
+            &self
+                .message
+                .clone()
+                .unwrap_or_else(|| "n/a".to_owned())
+                .red()
+        )
     }
 }
 
@@ -115,12 +124,11 @@ impl ConsoleTextNotifier {
 }
 
 impl Notifier for ConsoleTextNotifier {
-    type Event = (Summary, Vec<TestSuite>);
+    type Event = (Summary, Vec<SummaryWith<TestSuite>>);
     type CIContext = ();
     fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
-        event.0.display(&mut self.sink, 0)?;
         for suite in &event.1 {
-            suite.display(&mut self.sink, 0)?;
+            suite.value.display(&mut self.sink, 0)?;
         }
         Ok(())
     }
@@ -140,20 +148,20 @@ impl ConsoleJsonNotifier {
 }
 
 impl Notifier for ConsoleJsonNotifier {
-    type Event = (Summary, Vec<TestSuite>);
+    type Event = (Summary, Vec<SummaryWith<TestSuite>>);
     type CIContext = ();
 
     fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
         let (summary, test_suites) = event;
-        let mut successful: Vec<TestSuite> = Vec::new();
-        let mut failed: Vec<FailedTestSuite> = Vec::new();
+        let mut successful: Vec<SummaryWith<TestSuite>> = Vec::new();
+        let mut failed: Vec<SummaryWith<FailedTestSuite>> = Vec::new();
 
-        for suite in test_suites {
-            if suite.is_successful() {
-                successful.push(suite)
+        for with_summary in test_suites {
+            if with_summary.is_successful() {
+                successful.push(with_summary)
             } else {
-                if let Some(suite) = suite.as_failed() {
-                    failed.push(suite);
+                if let Some(failed_with_summary) = with_summary.value.as_failed() {
+                    failed.push(failed_with_summary);
                 }
             }
         }

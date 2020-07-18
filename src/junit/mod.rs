@@ -16,15 +16,11 @@ where
         .map_err(|_| Error::custom("Cannot parse duration"))
 }
 
-fn duration_to_f32<S>(duration: &Duration, s: S) -> std::result::Result<S::Ok, S::Error>
+fn duration_to_millis<S>(duration: &Duration, s: S) -> std::result::Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
-    use serde::ser::Error;
-    let std_duration = duration
-        .to_std()
-        .map_err(|_| Error::custom("Cannot convert to std duration"))?;
-    s.serialize_f32(std_duration.as_secs_f32())
+    s.serialize_i64(duration.num_milliseconds())
 }
 fn testskipped_to_boolean<S>(
     skipped: &Option<TestSkipped>,
@@ -37,15 +33,31 @@ where
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
+pub struct SummaryWith<T>
+where
+    T: Serialize + PartialEq,
+{
+    #[serde(flatten)]
+    pub summary: Summary,
+    #[serde(flatten)]
+    pub value: T,
+}
+
+impl<T> SummaryWith<T>
+where
+    T: Serialize + PartialEq,
+{
+    pub fn is_successful(&self) -> bool {
+        self.summary.errors == 0 && self.summary.failures == 0
+    }
+}
+
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct TestSuite {
     pub name: String,
-    pub tests: usize,
-    pub errors: usize,
-    pub failures: usize,
-    pub skipped: Option<usize>,
     #[serde(
         deserialize_with = "f32_to_duration",
-        serialize_with = "duration_to_f32"
+        serialize_with = "duration_to_millis"
     )]
     pub time: Duration,
     pub timestamp: NaiveDateTime,
@@ -54,43 +66,65 @@ pub struct TestSuite {
 }
 
 impl TestSuite {
-    pub fn skipped(&self) -> usize {
-        self.skipped.unwrap_or_default()
-    }
+    //TODO: remove
     pub fn is_successful(&self) -> bool {
-        self.failures == 0 && self.errors == 0
+        self.testcases.iter().any(|tc| tc.failure.is_some())
     }
-    pub fn as_failed(self) -> Option<FailedTestSuite> {
+    pub fn with_summary(self) -> SummaryWith<TestSuite> {
+        let mut tests = 0;
+        let mut failures = 0;
+        let mut errors = 0; //TODO: remove
+        let mut skipped = 0;
+
+        for test in &self.testcases {
+            tests += 1;
+            if test.skipped.is_some() {
+                skipped += 1;
+                continue;
+            }
+            if test.failure.is_some() {
+                failures += 1;
+                continue;
+            }
+            if test.error.is_some() {
+                errors += 1;
+                continue;
+            }
+        }
+
+        let summary = Summary {
+            time: self.time,
+            tests,
+            failures,
+            errors,
+            skipped,
+        };
+        SummaryWith {
+            summary,
+            value: self,
+        }
+    }
+
+    pub fn as_failed(self) -> Option<SummaryWith<FailedTestSuite>> {
+        let SummaryWith { summary, value } = self.with_summary();
         let mut failed_testcases: Vec<FailedTestCase> = Vec::new();
-        for t in self.testcases {
+
+        for t in value.testcases {
             if !t.is_successful() {
-                //TODO: review
                 failed_testcases.push(t.as_failed().unwrap());
             }
         }
+
         if failed_testcases.is_empty() {
             None
         } else {
-            Some(FailedTestSuite {
-                name: self.name,
-                time: self.time,
-                timestamp: self.timestamp,
+            let value = FailedTestSuite {
+                name: value.name,
+                time: value.time,
+                timestamp: value.timestamp,
                 failed_testcases: failed_testcases,
-            })
-        }
-    }
-}
-
-impl HasOutcome for TestSuite {
-    fn outcome(&self) -> TestOutcome {
-        if self.skipped() > 0 && self.skipped() == self.testcases.len() {
-            TestOutcome::Skipped
-        } else {
-            if self.failures > 0 {
-                TestOutcome::Failure
-            } else {
-                TestOutcome::Success
-            }
+            };
+            Some(SummaryWith { summary, value })
         }
     }
 }
@@ -101,36 +135,59 @@ pub struct TestCase {
     pub classname: String,
     #[serde(
         deserialize_with = "f32_to_duration",
-        serialize_with = "duration_to_f32"
+        serialize_with = "duration_to_millis"
     )]
     pub time: Duration,
     pub failure: Option<TestFailure>,
+    pub error: Option<TestFailure>,
     #[serde(serialize_with = "testskipped_to_boolean")]
     skipped: Option<TestSkipped>,
 }
 impl TestCase {
+    //TODO: remove
     pub fn is_skipped(&self) -> bool {
         self.skipped.is_some()
     }
+
+    //TODO: remove
     pub fn is_successful(&self) -> bool {
-        self.failure.is_none()
+        self.failure.is_none() && self.error.is_none()
     }
 
     fn as_failed(self) -> Option<FailedTestCase> {
-        if let Some(failure) = self.failure {
-            Some(FailedTestCase {
-                name: self.name,
-                classname: self.classname,
-                time: self.time,
-                failure: failure,
-            })
-        } else {
-            None
+        match self {
+            TestCase {
+                name,
+                classname,
+                time,
+                failure: Some(failure),
+                error: _,
+                skipped: _,
+            } => Some(FailedTestCase {
+                name,
+                classname,
+                time,
+                failure,
+            }),
+            TestCase {
+                name,
+                classname,
+                time,
+                failure: None,
+                error: Some(failure),
+                skipped: _,
+            } => Some(FailedTestCase {
+                name,
+                classname,
+                time,
+                failure,
+            }),
+            _ => None,
         }
     }
-}
-impl HasOutcome for TestCase {
-    fn outcome(&self) -> TestOutcome {
+
+    //TODO: remove this
+    pub fn outcome(&self) -> TestOutcome {
         match (self.is_skipped(), &self.failure) {
             (true, _) => TestOutcome::Skipped,
             (_, Some(_)) => TestOutcome::Failure,
@@ -143,20 +200,21 @@ impl HasOutcome for TestCase {
 pub struct FailedTestCase {
     pub name: String,
     pub classname: String,
-    #[serde(serialize_with = "duration_to_f32")]
+    #[serde(serialize_with = "duration_to_millis")]
     pub time: Duration,
-    pub failure: TestFailure,
+    pub failure: TestFailure, //TODO: use an enum here
 }
+
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct TestSkipped {}
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct Summary {
     #[serde(
         deserialize_with = "f32_to_duration",
-        serialize_with = "duration_to_f32"
+        serialize_with = "duration_to_millis"
     )]
-    pub total_time: Duration,
+    pub time: Duration,
     pub tests: usize,
     pub failures: usize,
     pub errors: usize,
@@ -167,17 +225,18 @@ impl Summary {
     pub fn is_successful(&self) -> bool {
         self.failures == 0 && self.errors == 0
     }
-    fn inc(&mut self, suite: &TestSuite) {
-        self.total_time = self.total_time + suite.time;
-        self.tests += suite.tests;
-        self.errors += suite.errors;
-        self.failures += suite.failures;
-        self.skipped += suite.skipped();
+    //TODO: find the right trait to implement add
+    fn inc(&mut self, that: &Summary) {
+        self.time = self.time + that.time;
+        self.tests += that.tests;
+        self.errors += that.errors;
+        self.failures += that.failures;
+        self.skipped += that.skipped;
     }
 
     fn zero() -> Self {
         Summary {
-            total_time: Duration::zero(),
+            time: Duration::zero(),
             tests: 0,
             failures: 0,
             errors: 0,
@@ -200,7 +259,7 @@ pub fn read_testsuites(
     project_dir: Option<PathBuf>,
     config: &Config,
     sort_by: Option<ReportSorting>,
-) -> anyhow::Result<(Vec<TestSuite>, Summary)> {
+) -> anyhow::Result<(Vec<SummaryWith<TestSuite>>, Summary)> {
     let current_dir = env::current_dir()?;
     let project_dir = project_dir.unwrap_or_else(|| current_dir);
     let mut summary = Summary::zero();
@@ -209,13 +268,13 @@ pub fn read_testsuites(
         &config.junit.report_dir_pattern,
         &mut summary,
     )?;
-    let mut test_suites: Vec<TestSuite> = visitor.collect();
+    let mut test_suites: Vec<SummaryWith<TestSuite>> = visitor.collect();
     if let Some(ReportSorting::Time(order)) = sort_by {
         test_suites.sort_by(|a, b| {
             if order == SortingOrder::Asc {
-                a.time.cmp(&b.time)
+                a.summary.time.cmp(&b.summary.time)
             } else {
-                b.time.cmp(&a.time)
+                b.summary.time.cmp(&a.summary.time)
             }
         })
     }
@@ -255,7 +314,8 @@ impl TestSuitesOutcome {
         } else {
             let failed_testsuites = suites
                 .into_iter()
-                .filter_map(|suite| suite.as_failed())
+                .filter_map(|ws| ws.value.as_failed())
+                .map(|ws| ws.value)
                 .collect();
             Ok(TestSuitesOutcome::Failure {
                 summary,
@@ -267,32 +327,34 @@ impl TestSuitesOutcome {
 
 #[derive(Debug, Serialize)]
 pub struct FullReport {
-    pub successful: Vec<TestSuite>,
-    pub failed: Vec<FailedTestSuite>,
+    pub successful: Vec<SummaryWith<TestSuite>>,
+    pub failed: Vec<SummaryWith<FailedTestSuite>>,
     pub summary: Summary,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TestFailure {
-    pub message: String,
+    pub message: Option<String>,
     #[serde(rename = "type")]
     pub classname: String,
-    #[serde(rename = "$value")]
+    #[serde(rename(deserialize = "$value"))]
     pub stack_trace: String,
 }
 
 #[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FailedTestSuite {
     pub name: String,
-    #[serde(serialize_with = "duration_to_f32")]
+    #[serde(serialize_with = "duration_to_millis")]
     pub time: Duration,
     pub timestamp: NaiveDateTime,
     pub failed_testcases: Vec<FailedTestCase>,
 }
 
-fn read_suite<R: io::Read>(input: R) -> Result<TestSuite> {
+fn read_suite<R: io::Read>(input: R) -> Result<SummaryWith<TestSuite>> {
     let suite: TestSuite = serde_xml_rs::from_reader(input)?;
-    Ok(suite)
+    Ok(suite.with_summary())
 }
 
 #[cfg(test)]
@@ -337,12 +399,12 @@ com.example
          </testsuite>
          "##;
 
-    fn read_failed_testsuite<R: io::Read>(input: R) -> Option<FailedTestSuite> {
+    fn read_failed_testsuite<R: io::Read>(input: R) -> Option<SummaryWith<FailedTestSuite>> {
         let suite = read_suite(input).unwrap();
         if suite.is_successful() {
             None
         } else {
-            let failed_testsuite = suite.as_failed().unwrap();
+            let failed_testsuite = suite.value.as_failed().unwrap();
             Some(failed_testsuite)
         }
     }
@@ -352,10 +414,6 @@ com.example
         let summary: TestSuite = from_reader(SUCCESS_TESTSUITE_XML.as_bytes()).unwrap();
         let expected = TestSuite {
             name: "com.example.LiveTopicCounterTest".to_owned(),
-            tests: 1,
-            errors: 0,
-            failures: 0,
-            skipped: Some(0),
             time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
             timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
             testcases: vec![
@@ -366,6 +424,7 @@ com.example
                 classname: "com.example.LiveTopicCounterTest".to_owned(),
                 time: Duration::zero() + Duration::milliseconds(079),
                 failure: None,
+                error: None,
                 skipped: None,
             },
                 TestCase {
@@ -374,12 +433,74 @@ com.example
                 classname: "com.example.LiveTopicCounterTest".to_owned(),
                 time: Duration::zero() + Duration::milliseconds(1),
                 failure: None,
+                error: None,
                 skipped: Some(TestSkipped{}),
             },
 
             ],
         };
         assert_eq!(summary, expected);
+    }
+    #[test]
+    fn serialize_testsuite() {
+        let suite = TestSuite {
+            name: "com.example.LiveTopicCounterTest".to_owned(),
+            time: Duration::milliseconds(250),
+            timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
+            testcases: vec![
+                TestCase {
+                name:
+                    "LiveTopicCounter should raise an error when the supplied topic does not exist"
+                        .to_owned(),
+                classname: "com.example.LiveTopicCounterTest".to_owned(),
+                time: Duration::zero() + Duration::milliseconds(079),
+                error: None,
+            failure: Some(TestFailure {
+                message: Some("100 did not equal 101".to_owned()),
+                classname: "org.scalatest.exceptions.TestFailedException".to_owned(),
+                stack_trace: "stack-trace...".to_owned(),
+            }),
+
+                skipped: None,
+            },
+                TestCase {
+                name:
+                        "LiveTopicCounter should skip this test".to_owned(),
+                classname: "com.example.LiveTopicCounterTest".to_owned(),
+                time: Duration::zero() + Duration::milliseconds(1),
+                failure: None,
+                error: None,
+                skipped: Some(TestSkipped{}),
+            },
+
+            ],
+        };
+        let expected = serde_json::json!({
+          "tests":2,
+          "errors":0,
+          "failures":1,
+          "skipped":1,
+          "time":250,
+          "timestamp":"2020-06-07T14:18:12",
+          "name":"com.example.LiveTopicCounterTest",
+          "testcase":[{
+            "classname":"com.example.LiveTopicCounterTest",
+            "failure":{
+                 "message":"100 did not equal 101","stack_trace":"stack-trace...",
+                 "type":"org.scalatest.exceptions.TestFailedException"
+            },
+            "name":"LiveTopicCounter should raise an error when the supplied topic does not exist",
+            "skipped":false,
+            "time":79},
+            {"classname":"com.example.LiveTopicCounterTest",
+             "failure":null,
+             "name":"LiveTopicCounter should skip this test",
+             "skipped":true,
+             "time":1
+            }]
+        });
+        let json_value = serde_json::to_value(suite.with_summary()).unwrap();
+        assert_eq!(json_value, expected);
     }
 
     #[test]
@@ -390,16 +511,25 @@ com.example
             classname: "com.example.LiveTopicCounterTest".to_owned(),
             time: Duration::zero() + Duration::milliseconds(461),
             failure: TestFailure {
-                message: "100 did not equal 101".to_owned(),
+                message: Some("100 did not equal 101".to_owned()),
                 classname: "org.scalatest.exceptions.TestFailedException".to_owned(),
                 stack_trace: "stack-trace...".to_owned(),
             },
         };
-        let expected = FailedTestSuite {
-            name: "com.example.LiveTopicCounterTest".to_owned(),
-            time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
-            timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 13),
-            failed_testcases: vec![failed],
+        let expected = SummaryWith {
+            summary: Summary {
+                tests: 5,
+                failures: 1,
+                errors: 0,
+                skipped: 0,
+                time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
+            },
+            value: FailedTestSuite {
+                name: "com.example.LiveTopicCounterTest".to_owned(),
+                time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
+                timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 13),
+                failed_testcases: vec![failed],
+            },
         };
         let failed = suite.as_failed().unwrap();
         assert_eq!(failed, expected);
@@ -428,12 +558,13 @@ com.example
         create_report_dir(base_dir, "testreports", 3, 3, 7).expect("Couldn't setup test data");
         let mut summary = Summary::zero();
 
-        let visitor = TestSuiteVisitor::from_basedir(base_dir, report_dir_pattern, &mut summary)
-            .expect("Couldn't initialize visitor");
+        let visitor =
+            TestSuiteVisitor::from_basedir_(base_dir, report_dir_pattern, &mut summary, false)
+                .expect("Couldn't initialize visitor");
 
         for test_suite in visitor {
-            if let Some(failed_suite) = test_suite.as_failed() {
-                failed_suites.push(failed_suite);
+            if let Some(with_summary) = test_suite.value.as_failed() {
+                failed_suites.push(with_summary.value);
             }
         }
         assert_eq!(failed_suites.len(), 3);

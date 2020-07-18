@@ -1,4 +1,4 @@
-use super::{read_suite, Summary, TestSuite};
+use super::{read_suite, Summary, SummaryWith, TestSuite};
 use crate::console::ConsoleDisplay;
 use anyhow::Result;
 use atty::Stream;
@@ -81,8 +81,17 @@ impl<'s> TestSuiteVisitor<'s> {
         report_dir_pattern: &str,
         summary: &'s mut Summary,
     ) -> Result<Self> {
+        TestSuiteVisitor::from_basedir_(base_dir, report_dir_pattern, summary, true)
+    }
+
+    pub(super) fn from_basedir_<P: AsRef<Path>>(
+        base_dir: P,
+        report_dir_pattern: &str,
+        summary: &'s mut Summary,
+        display_progress: bool,
+    ) -> Result<Self> {
         let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
-        let display_progress = atty::is(Stream::Stdout);
+        let display_progress = display_progress && atty::is(Stream::Stdout);
         let sink = Box::new(io::stdout());
         Ok(TestSuiteVisitor {
             visitor,
@@ -107,7 +116,7 @@ impl<'s> TestSuiteVisitor<'s> {
     }
 }
 impl<'s> Iterator for TestSuiteVisitor<'s> {
-    type Item = TestSuite;
+    type Item = SummaryWith<TestSuite>;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(path) = self.visitor.next() {
             let display_path = path.display();
@@ -117,7 +126,7 @@ impl<'s> Iterator for TestSuiteVisitor<'s> {
                 "Couldn't parse junit TestSuite from XML report {}",
                 display_path
             ));
-            self.summary.inc(&suite);
+            self.summary.inc(&suite.summary);
             self.progress_update();
             Some(suite)
         } else {
