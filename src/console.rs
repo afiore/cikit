@@ -124,7 +124,7 @@ impl ConsoleTextNotifier {
 }
 
 impl Notifier for ConsoleTextNotifier {
-    type Event = (Summary, Vec<SummaryWith<TestSuite>>);
+    type Event = (Summary, Vec<SuiteWithSummary>);
     type CIContext = ();
     fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
         for suite in &event.1 {
@@ -148,27 +148,31 @@ impl ConsoleJsonNotifier {
 }
 
 impl Notifier for ConsoleJsonNotifier {
-    type Event = (Summary, Vec<SummaryWith<TestSuite>>);
+    type Event = (Summary, Vec<SuiteWithSummary>);
     type CIContext = ();
 
     fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
-        let (summary, test_suites) = event;
-        let mut successful: Vec<SummaryWith<TestSuite>> = Vec::new();
-        let mut failed: Vec<SummaryWith<FailedTestSuite>> = Vec::new();
-
-        for with_summary in test_suites {
-            if with_summary.is_successful() {
-                successful.push(with_summary)
-            } else {
-                if let Some(failed_with_summary) = with_summary.value.as_failed() {
-                    failed.push(failed_with_summary);
+        let (summary, all_suites) = event;
+        let failed: Vec<FailedSuiteWithSummary> = all_suites
+            .iter()
+            .filter_map(|suite| {
+                if !suite.is_successful() {
+                    suite.value.clone().as_failed()
+                } else {
+                    None
                 }
-            }
-        }
+            })
+            .collect();
+
+        // for with_summary in all_suites {
+        //     if let Some(failed_with_summary) = with_summary.value.as_failed() {
+        //         failed.push(failed_with_summary);
+        //     }
+        // }
 
         let full_report = FullReport {
             summary,
-            successful,
+            all_suites,
             failed,
         };
 

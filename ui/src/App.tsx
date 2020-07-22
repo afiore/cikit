@@ -2,13 +2,25 @@ import React from 'react';
 import './App.css';
 import humanizeDuration from 'humanize-duration';
 
-interface FailedTestcase {
+const showDuration = humanizeDuration.humanizer({
+  language: "shortEn",
+  units: ["m", "s", "ms"],
+  languages: {
+    shortEn: {
+      m: () => "m",
+      s: () => "s",
+      ms: () => "ms",
+    },
+  },
+});
+
+interface TestCase {
   name: string;
   time: number;
 }
 
 interface FailedTestcases {
-  testcases: FailedTestcase[];
+  testcases: TestCase[];
 }
 
 interface FailedTestSuite {
@@ -17,7 +29,7 @@ interface FailedTestSuite {
   tests: number;
   failures: number;
   timestamp: Date;
-  failedTestcases: FailedTestcase[];
+  failedTestcases: TestCase[];
 }
 
 interface FailedSuites {
@@ -30,7 +42,7 @@ const FailedTestsFragment = ({ testcases }: FailedTestcases) => (
       testcases.map(test => {
         return (<tr key={test.name}>
           <td colSpan={3}>{test.name}</td>
-          <td>{humanizeDuration(test.time, { units: ["s", "ms"] })}</td>
+          <td>{showDuration(test.time)}</td>
         </tr>)
       })
     }
@@ -54,32 +66,34 @@ class App extends React.Component<any, FailedSuites> {
   }
 
   render() {
-    console.info(this.state);
     return (
-      <table className="pure-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Tests</th>
-            <th>Failed</th>
-            <th>Duration</th>
-          </tr>
-        </thead>
-        {this.state.failed.map(suite => {
-          return (
-            <tbody>
-              <tr key={suite.name} className={"pure-table-odd"}>
-                <td>{suite.name}</td>
-                <td>{suite.tests}</td>
-                <td>{suite.failures}</td>
-                <td>{humanizeDuration(suite.time, { units: ["s", "ms"] })}</td>
-              </tr>
-              <FailedTestsFragment testcases={suite.failedTestcases} />
-            </tbody>
-          )
-        })
-        }
-      </table >
+      <section>
+        <h2>Failed test suites</h2>
+        <table className="pure-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Tests</th>
+              <th>Failed</th>
+              <th>Duration</th>
+            </tr>
+          </thead>
+          {this.state.failed.map(suite => {
+            return (
+              <tbody>
+                <tr key={suite.name} className={"pure-table-odd"}>
+                  <td>{suite.name}</td>
+                  <td>{suite.tests}</td>
+                  <td>{suite.failures}</td>
+                  <td>{showDuration(suite.time)}</td>
+                </tr>
+                <FailedTestsFragment testcases={suite.failedTestcases} />
+              </tbody>
+            )
+          })
+          }
+        </table >
+      </section>
     );
   }
 }
