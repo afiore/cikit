@@ -124,7 +124,7 @@ impl<'s> Iterator for TestSuiteVisitor<'s> {
     fn next(&mut self) -> Option<Self::Item> {
         if !self.current.is_empty() {
             self.current.pop().map(|SummaryWith { summary, value }| {
-                self.summary.inc(&summary);
+                self.summary += &summary;
                 self.progress_update();
                 SummaryWith { summary, value }
             })

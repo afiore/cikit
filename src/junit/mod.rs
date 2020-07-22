@@ -4,7 +4,7 @@ use chrono::{Duration, NaiveDateTime};
 use fs::TestSuiteVisitor;
 use serde::{Deserialize, Serialize};
 use serdes::*;
-use std::{env, io, iter::Sum, ops::Add, path::PathBuf};
+use std::{env, io, ops::AddAssign, path::PathBuf};
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct SummaryWith<T>
@@ -201,15 +201,6 @@ impl Summary {
     pub fn is_successful(&self) -> bool {
         self.failures == 0 && self.errors == 0
     }
-    //TODO: remove and use instance of Add instead
-    fn inc(&mut self, that: &Summary) {
-        self.time = self.time + that.time;
-        self.tests += that.tests;
-        self.errors += that.errors;
-        self.failures += that.failures;
-        self.skipped += that.skipped;
-    }
-
     fn zero() -> Self {
         Summary {
             time: Duration::zero(),
@@ -221,28 +212,13 @@ impl Summary {
     }
 }
 
-impl Add for Summary {
-    type Output = Self;
-    fn add(self, that: Self) -> Self::Output {
-        let time = self.time + that.time;
-        let tests = self.tests + that.tests;
-        let errors = self.errors + that.errors;
-        let failures = self.failures + that.failures;
-        let skipped = self.skipped + that.skipped;
-
-        Summary {
-            time,
-            tests,
-            errors,
-            failures,
-            skipped,
-        }
-    }
-}
-
-impl Sum for Summary {
-    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(Summary::zero(), |acc, s| acc + s)
+impl AddAssign<&Summary> for &mut Summary {
+    fn add_assign(&mut self, rhs: &Summary) {
+        self.time = self.time + rhs.time;
+        self.tests += rhs.tests;
+        self.errors += rhs.errors;
+        self.failures += rhs.failures;
+        self.skipped += rhs.skipped;
     }
 }
 
