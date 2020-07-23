@@ -29,10 +29,8 @@ where
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct TestSuite {
     pub name: String,
-    #[serde(
-        deserialize_with = "f32_to_duration",
-        serialize_with = "duration_to_millis"
-    )]
+    #[serde(deserialize_with = "f32_to_duration")]
+    #[serde(skip_serializing)]
     pub time: Duration,
     pub timestamp: NaiveDateTime,
     #[serde(rename = "testcase", default)]
@@ -323,7 +321,7 @@ pub struct TestFailure {
 #[serde(rename_all = "camelCase")]
 pub struct FailedTestSuite {
     pub name: String,
-    #[serde(serialize_with = "duration_to_millis")]
+    #[serde(skip_serializing)]
     pub time: Duration,
     pub timestamp: NaiveDateTime,
     pub failed_testcases: Vec<FailedTestCase>,
@@ -450,8 +448,10 @@ com.example
 
     #[test]
     fn parse_testsuite_wrapped() {
-        let _ = read_suites(SUCCESS_TESTSUITE_XML.as_bytes()).unwrap();
-        let _ = read_suites(SUCCESS_TESTSUITE_WRAPPED.as_bytes()).unwrap();
+        let suites1 = read_suites(SUCCESS_TESTSUITE_XML.as_bytes()).unwrap();
+        let suites2 = read_suites(SUCCESS_TESTSUITE_WRAPPED.as_bytes()).unwrap();
+        assert!(suites1.len() == 1);
+        assert_eq!(suites1, suites2);
     }
 
     #[test]
