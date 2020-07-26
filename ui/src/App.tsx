@@ -1,98 +1,41 @@
 import React from 'react';
 import './App.css';
-import humanizeDuration from 'humanize-duration';
+import * as FailedSuites from './components/FailedSuites';
+import * as AllSuites from './components/AllSuites';
+import { FailedTestSuite, TestSuite, } from './dtos';
 
-const showDuration = humanizeDuration.humanizer({
-  language: "shortEn",
-  units: ["m", "s", "ms"],
-  languages: {
-    shortEn: {
-      m: () => "m",
-      s: () => "s",
-      ms: () => "ms",
-    },
-  },
-});
-
-interface TestCase {
-  name: string;
-  time: number;
+interface AppProps {
+  datasetUri: string
 }
-
-interface FailedTestcases {
-  testcases: TestCase[];
-}
-
-interface FailedTestSuite {
-  name: string;
-  time: number;
-  tests: number;
-  failures: number;
-  timestamp: Date;
-  failedTestcases: TestCase[];
-}
-
-interface FailedSuites {
+interface AppState {
   failed: FailedTestSuite[];
+  all: TestSuite[];
 }
 
-const FailedTestsFragment = ({ testcases }: FailedTestcases) => (
-  <React.Fragment>
-    {
-      testcases.map(test => {
-        return (<tr key={test.name}>
-          <td colSpan={3}>{test.name}</td>
-          <td>{showDuration(test.time)}</td>
-        </tr>)
-      })
-    }
-  </React.Fragment>
-)
-
-class App extends React.Component<any, FailedSuites> {
+class App extends React.Component<AppProps, AppState> {
   constructor(props: any) {
     super(props);
 
     this.state = {
       failed: [],
+      all: []
     };
   }
+
   componentDidMount() {
-    fetch('/data.json')
+    fetch(this.props.datasetUri)
       .then(response => response.json())
       .then(result => this.setState({
-        failed: result.failed
+        failed: result.failed,
+        all: result.allSuites,
       }));
   }
 
   render() {
     return (
       <section>
-        <h2>Failed test suites</h2>
-        <table className="pure-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Tests</th>
-              <th>Failed</th>
-              <th>Duration</th>
-            </tr>
-          </thead>
-          {this.state.failed.map(suite => {
-            return (
-              <tbody>
-                <tr key={suite.name} className={"pure-table-odd"}>
-                  <td>{suite.name}</td>
-                  <td>{suite.tests}</td>
-                  <td>{suite.failures}</td>
-                  <td>{showDuration(suite.time)}</td>
-                </tr>
-                <FailedTestsFragment testcases={suite.failedTestcases} />
-              </tbody>
-            )
-          })
-          }
-        </table >
+        <FailedSuites.Component failed={this.state.failed} />
+        <AllSuites.Component all={this.state.all} />
       </section>
     );
   }
