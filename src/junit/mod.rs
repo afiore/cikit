@@ -301,6 +301,7 @@ impl TestSuitesOutcome {
 }
 
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FullReport {
     pub all_suites: Vec<SuiteWithSummary>,
     pub failed: Vec<FailedSuiteWithSummary>,
