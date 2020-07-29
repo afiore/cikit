@@ -11,7 +11,7 @@ export class Component extends React.Component<Props, any> {
         return (
             <section>
                 <h2>All suites</h2>
-                <table className="pure-table">
+                <table className="pure-table pure-table-bordered">
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -21,20 +21,20 @@ export class Component extends React.Component<Props, any> {
                             <th>Duration</th>
                         </tr>
                     </thead>
-                    {this.props.all.map(suite => {
-                        return (
-                            <tbody key={suite.name + "-tbody"}>
-                                <tr key={suite.name + "-all-tests"} className={"pure-table-odd"}>
+                    <tbody>
+                        {this.props.all.map(suite => {
+                            return (
+                                <tr key={suite.name + "-all-tests"}>
                                     <td>{suite.name}</td>
                                     <td>{suite.tests}</td>
                                     <td>{suite.skipped}</td>
                                     <td>{suite.failures}</td>
                                     <td>{showDuration(suite.time)}</td>
                                 </tr>
-                            </tbody>
-                        )
-                    })
-                    }
+                            )
+                        })
+                        }
+                    </tbody>
                 </table >
             </section>
         );

@@ -11,3 +11,14 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+table {
+  width: 100%;
+}
+
+.failedtests {
+  font-size: smaller;
+}
+.failedtests td[colspan="4"] {
+  padding-left: 1.5em;
+}

@@ -3,86 +3,78 @@ import { showDuration } from '../utils';
 import React from 'react';
 
 interface FragProps {
-    suite: FailedTestSuite
-}
-interface FragState {
+    failedTestcases: TestCase[]
     isExpanded: boolean
 }
 
-class FailedTestsFragment extends React.Component<FragProps, FragState>{
-    constructor(props: FragProps) {
-        super(props)
-        this.state = {
-            isExpanded: false
-        };
-    }
-    handleClick = () => {
-        this.setState((prevState: FragState, _) => { return { isExpanded: !prevState.isExpanded } });
-        console.log('this is:', this);
-    }
+const FailedTestsFragment = (props: FragProps) => {
+    return (<>
+        {props.isExpanded ? props.failedTestcases.map(test => {
+            return (
+                <tr key={test.name} className={"failedtests"}>
+                    <td colSpan={4}>{test.name}</td>
+                    <td>{showDuration(test.time)}</td>
+                </tr>)
+        }) : null}
 
-    renderFailedTests = () => {
-        if (this.state.isExpanded) {
-            return this.props.suite.failedTestcases.map(test => {
-                return (
-                    <tr key={test.name}>
-                        <td colSpan={4}>{test.name}</td>
-                        <td>{showDuration(test.time)}</td>
-                    </tr>)
-            })
-        }
-    }
-
-    render() {
-
-        return (<>
-            <tr key={this.props.suite.name} className={"pure-table-odd"}>
-                <td>{this.props.suite.name}</td>
-                <td>{this.props.suite.tests}</td>
-                <td><a href="#" onClick={this.handleClick}>{this.props.suite.failures}</a></td>
-                <td>{this.props.suite.skipped}</td>
-                <td>{showDuration(this.props.suite.time)}</td>
-            </tr>
-            {this.state.isExpanded ? this.props.suite.failedTestcases.map(test => {
-                return (
-                    <tr key={test.name}>
-                        <td colSpan={4}>{test.name}</td>
-                        <td>{showDuration(test.time)}</td>
-                    </tr>)
-            }) : null}
-
-        </>)
-    }
-
+    </>)
 }
+
 
 interface Props {
     failed: FailedTestSuite[]
 }
+interface State {
+    expandedSuite?: string
+}
 
-export class Component extends React.Component<Props, any> {
+export class Component extends React.Component<Props, State> {
+    constructor(props: Props) {
+        super(props);
+        this.state = {
+            expandedSuite: undefined
+        }
+    }
+    handleOnClick = (suiteName: string) => {
+        this.setState((prevState, _) => {
+            return prevState.expandedSuite === suiteName ?
+                {
+                    expandedSuite: undefined
+                } : { expandedSuite: suiteName }
+        });
+    }
     render() {
         return (
             <section>
                 <h2>Failed suites</h2>
-                <table className="pure-table">
+                <table className={"pure-table pure-table-bordered"}>
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Tests</th>
-                            <th>Failed</th>
-                            <th>Skipped</th>
-                            <th>Duration</th>
+                            <th key="name">Name</th>
+                            <th key="tests">Tests</th>
+                            <th key="failed">Failed</th>
+                            <th key="skipped">Skipped</th>
+                            <th key="duration">Duration</th>
                         </tr>
                     </thead>
-                    {this.props.failed.map(suite => {
-                        return (
-                            <tbody key={suite.name}>
-                                <FailedTestsFragment suite={suite} />
-                            </tbody>
-                        )
-                    })
-                    }
+                    <tbody>
+                        {this.props.failed.map(suite => {
+                            return (
+                                <>
+                                    <tr key={suite.name}>
+                                        <td>{suite.name}</td>
+                                        <td>{suite.tests}</td>
+                                        <td><button title="toggle test cases" onClick={() => this.handleOnClick(suite.name)}>{suite.failures}</button></td>
+                                        <td>{suite.skipped}</td>
+                                        <td>{showDuration(suite.time)}</td>
+                                    </tr>
+
+                                    <FailedTestsFragment failedTestcases={suite.failedTestcases} isExpanded={this.state.expandedSuite === suite.name} />
+                                </>
+                            )
+                        })
+                        }
+                    </tbody>
                 </table >
             </section>
         );

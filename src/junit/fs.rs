@@ -69,7 +69,6 @@ impl Iterator for ReportVisitor {
 }
 
 pub(super) struct TestSuiteVisitor<'s> {
-    //TODO: remove lifetime param and simply reset at each iteration using `Add` instance
     summary: &'s mut Summary,
     current: Vec<SuiteWithSummary>,
     visitor: ReportVisitor,

@@ -164,12 +164,6 @@ impl Notifier for ConsoleJsonNotifier {
             })
             .collect();
 
-        // for with_summary in all_suites {
-        //     if let Some(failed_with_summary) = with_summary.value.as_failed() {
-        //         failed.push(failed_with_summary);
-        //     }
-        // }
-
         let full_report = FullReport {
             summary,
             all_suites,
