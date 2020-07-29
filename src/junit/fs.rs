@@ -1,4 +1,4 @@
-use super::{read_suite, Summary, TestSuite};
+use super::{read_suites, SuiteWithSummary, Summary, SummaryWith};
 use crate::console::ConsoleDisplay;
 use anyhow::Result;
 use atty::Stream;
@@ -70,6 +70,7 @@ impl Iterator for ReportVisitor {
 
 pub(super) struct TestSuiteVisitor<'s> {
     summary: &'s mut Summary,
+    current: Vec<SuiteWithSummary>,
     visitor: ReportVisitor,
     display_progress: bool,
     sink: Box<dyn io::Write>,
@@ -81,11 +82,22 @@ impl<'s> TestSuiteVisitor<'s> {
         report_dir_pattern: &str,
         summary: &'s mut Summary,
     ) -> Result<Self> {
+        TestSuiteVisitor::from_basedir_(base_dir, report_dir_pattern, summary, true)
+    }
+
+    pub(super) fn from_basedir_<P: AsRef<Path>>(
+        base_dir: P,
+        report_dir_pattern: &str,
+        summary: &'s mut Summary,
+        display_progress: bool,
+    ) -> Result<Self> {
         let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
-        let display_progress = atty::is(Stream::Stdout);
+        let display_progress = display_progress && atty::is(Stream::Stdout);
         let sink = Box::new(io::stdout());
+        let current = vec![];
         Ok(TestSuiteVisitor {
             visitor,
+            current,
             summary,
             display_progress,
             sink,
@@ -107,22 +119,28 @@ impl<'s> TestSuiteVisitor<'s> {
     }
 }
 impl<'s> Iterator for TestSuiteVisitor<'s> {
-    type Item = TestSuite;
+    type Item = SuiteWithSummary;
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(path) = self.visitor.next() {
-            let display_path = path.display();
-            let file = fs::File::open(path.clone())
-                .expect(&format!("Couldn't open report file: {}", display_path));
-            let suite = read_suite(file).expect(&format!(
-                "Couldn't parse junit TestSuite from XML report {}",
-                display_path
-            ));
-            self.summary.inc(&suite);
-            self.progress_update();
-            Some(suite)
+        if !self.current.is_empty() {
+            self.current.pop().map(|SummaryWith { summary, value }| {
+                self.summary += &summary;
+                self.progress_update();
+                SummaryWith { summary, value }
+            })
         } else {
-            self.end_progress_update();
-            None
+            if let Some(path) = self.visitor.next() {
+                let display_path = path.display();
+                let file = fs::File::open(path.clone())
+                    .expect(&format!("Couldn't open report file: {}", display_path));
+                self.current = read_suites(file).expect(&format!(
+                    "Couldn't parse junit TestSuite from XML report {}",
+                    display_path
+                ));
+                self.next()
+            } else {
+                self.end_progress_update();
+                None
+            }
         }
     }
 }
