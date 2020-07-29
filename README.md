@@ -1,6 +1,6 @@
 ## CI Kit
 
-Playground project to learn Rust while building minimum viable CI reporting experience.
+Playground project to learn Rust while building a minimum viable CI reporting experience.
 
 ### Status
 
@@ -8,7 +8,7 @@ Playground project to learn Rust while building minimum viable CI reporting expe
 
 ### Goals
 
-- Provide a minimal but functional UI to display JUnit test reports (both CLI and web-based).
+- Provide a minimal but functional UI to display JUnit test reports both through the CLI and as an HTML document.
 - Notify test outcome through various channels: i.e. slack web-hooks, github comments, etc.
 - Have fun!
 
