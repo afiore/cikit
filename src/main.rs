@@ -1,13 +1,14 @@
 use cikit::config::Config;
 use cikit::junit;
 use cikit::{
-    console::{ConsoleJsonNotifier, ConsoleTextNotifier},
+    console::{ConsoleJsonReport, ConsoleTextReport},
     github::GithubContext,
     notify::Notifier,
     slack::SlackNotifier,
 };
 
-use junit::{ReportSorting, Summary, SummaryWith, TestSuite, TestSuitesOutcome};
+use cikit::html::HTMLReport;
+use junit::{ReportSorting, TestSuitesOutcome};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -18,14 +19,20 @@ enum Format {
         #[structopt(short, long, help = "do not pretty print json")]
         compact: bool,
     },
-    // Html {
-    //     #[structopt(
-    //         short,
-    //         long,
-    //         help = "output directory of the HTML report. Defaults to 'report'"
-    //     )]
-    //     output_dir: Option<PathBuf>,
-    // }
+    Html {
+        #[structopt(
+            short,
+            long,
+            help = "output directory of the HTML report. Defaults to 'report'"
+        )]
+        output_dir: Option<PathBuf>,
+        #[structopt(
+            short,
+            long,
+            help = "overwrite the output directory content if the directory exists"
+        )]
+        force: bool,
+    },
 }
 
 impl Default for Format {
@@ -38,7 +45,7 @@ impl Default for Format {
 enum Cmd {
     ///Notifies the build outcome via Slack
     Notify { github_event_file: PathBuf },
-    ///Reads the Junit test report
+    ///Reads the JUnit test report and renders it in muliple formats
     TestReport {
         #[structopt(short, long, help = "time [ASC|DESC]")]
         sort_by: Option<ReportSorting>,
@@ -73,14 +80,17 @@ fn main() -> anyhow::Result<()> {
         }
         Cmd::TestReport { sort_by, format } => {
             let (test_suites, summary) = junit::read_testsuites(opt.project_dir, &config, sort_by)?;
-            let mut notifier: Box<
-                dyn Notifier<CIContext = (), Event = (Summary, Vec<SummaryWith<TestSuite>>)>,
-            > = match format {
-                Format::Text => Box::new(ConsoleTextNotifier::stdout()),
-                Format::Json { compact } => Box::new(ConsoleJsonNotifier::stdout(compact)),
-                // Format::Html { output_dir: _ } => todo!(),
-            };
-            notifier.notify((summary, test_suites), ())
+            match format {
+                Format::Text => ConsoleTextReport::stdout().render(test_suites),
+                Format::Json { compact } => {
+                    ConsoleJsonReport::stdout(compact).render(summary, test_suites)
+                }
+                Format::Html { output_dir, force } => {
+                    let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("report"));
+                    let report = HTMLReport::new(output_dir, force)?;
+                    report.write(summary, test_suites)
+                }
+            }
         }
     }
 }

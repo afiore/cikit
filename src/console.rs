@@ -3,7 +3,7 @@ use colored::{Color, ColoredString, Colorize};
 use io::Result;
 use std::io;
 
-use crate::{junit::*, notify::Notifier};
+use crate::junit::*;
 
 const INDENT_STR: &str = " ";
 
@@ -89,8 +89,9 @@ impl ConsoleDisplay for TestCase {
     }
 }
 
-impl ConsoleDisplay for TestSuite {
+impl ConsoleDisplay for SuiteWithSummary {
     fn display(&self, f: &mut Box<dyn io::Write>, depth: usize) -> Result<()> {
+        let suite = &self.value;
         let outcome_gpyph = if self.is_successful() {
             "✓".green()
         } else {
@@ -101,58 +102,56 @@ impl ConsoleDisplay for TestSuite {
             "{}{} {:10} {}",
             INDENT_STR.repeat(depth),
             outcome_gpyph,
-            display::duration(self.time.to_std().unwrap()),
-            self.name.bold()
+            display::duration(suite.time.to_std().unwrap()),
+            suite.name.bold()
         )?;
-        for test_case in &self.testcases {
+        for test_case in &suite.testcases {
             test_case.display(f, depth + 1)?;
         }
         Ok(())
     }
 }
 
-pub struct ConsoleTextNotifier {
+pub struct ConsoleTextReport {
     sink: Box<dyn io::Write>,
 }
-impl ConsoleTextNotifier {
+impl ConsoleTextReport {
     fn sink_to(sink: Box<dyn io::Write>) -> Self {
-        ConsoleTextNotifier { sink }
+        ConsoleTextReport { sink }
     }
     pub fn stdout() -> Self {
-        ConsoleTextNotifier::sink_to(Box::new(io::stdout()))
+        ConsoleTextReport::sink_to(Box::new(io::stdout()))
     }
 }
 
-impl Notifier for ConsoleTextNotifier {
-    type Event = (Summary, Vec<SuiteWithSummary>);
-    type CIContext = ();
-    fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
-        for suite in &event.1 {
-            suite.value.display(&mut self.sink, 0)?;
+impl ConsoleTextReport {
+    pub fn render(&mut self, test_suites: Vec<SuiteWithSummary>) -> anyhow::Result<()> {
+        for suite in &test_suites {
+            suite.display(&mut self.sink, 0)?;
         }
         Ok(())
     }
 }
 
-pub struct ConsoleJsonNotifier {
+pub struct ConsoleJsonReport {
     compact: bool,
     sink: Box<dyn io::Write>,
 }
-impl ConsoleJsonNotifier {
-    fn sink_to(compact: bool, sink: Box<dyn io::Write>) -> Self {
-        ConsoleJsonNotifier { compact, sink }
+impl ConsoleJsonReport {
+    pub fn sink_to(compact: bool, sink: Box<dyn io::Write>) -> Self {
+        ConsoleJsonReport { compact, sink }
     }
     pub fn stdout(compact: bool) -> Self {
-        ConsoleJsonNotifier::sink_to(compact, Box::new(io::stdout()))
+        ConsoleJsonReport::sink_to(compact, Box::new(io::stdout()))
     }
 }
 
-impl Notifier for ConsoleJsonNotifier {
-    type Event = (Summary, Vec<SuiteWithSummary>);
-    type CIContext = ();
-
-    fn notify(&mut self, event: Self::Event, _ctx: Self::CIContext) -> anyhow::Result<()> {
-        let (summary, all_suites) = event;
+impl ConsoleJsonReport {
+    pub fn render(
+        &mut self,
+        summary: Summary,
+        all_suites: Vec<SuiteWithSummary>,
+    ) -> anyhow::Result<()> {
         let failed: Vec<FailedSuiteWithSummary> = all_suites
             .iter()
             .filter_map(|suite| {

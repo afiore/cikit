@@ -50,7 +50,7 @@ and
 Finally, you can iteratively recompile and run the program by prefixing the normal executable call with `cargo run --`:
 
 ```bash
-RUST_LOG='cikit=debug' RUST_BACKTRACE=1 cargo run -- -c sample.config.toml ~/code/project-with-junit test-report text
+RUST_LOG='cikit=debug' RUST_BACKTRACE=1 cargo run -- -c sample.config.toml ~/code/project-with-junit test-report html -o test-report -f
 ```
 
-You might want to amend the `report_dir_pattern` config value with a glob expression that matches your project junit XML report dirs.
+You might want to amend the `report_dir_pattern` config value with a glob expression that matches your project junit XML report dir/s.

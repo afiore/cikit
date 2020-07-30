@@ -38,10 +38,6 @@ pub struct TestSuite {
 }
 
 impl TestSuite {
-    //TODO: remove
-    pub fn is_successful(&self) -> bool {
-        self.testcases.iter().any(|tc| tc.failure.is_some())
-    }
     pub fn with_summary(self) -> SuiteWithSummary {
         let mut tests = 0;
         let mut failures = 0;
