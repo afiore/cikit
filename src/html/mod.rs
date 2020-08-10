@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     console::ConsoleJsonReport,
+    github::GithubEvent,
     junit::{SuiteWithSummary, Summary},
 };
 use fs::File;
@@ -32,21 +33,24 @@ impl HTMLReport {
         })
     }
 
-    pub fn write(&self, summary: Summary, suites: Vec<SuiteWithSummary>) -> anyhow::Result<()> {
-        let json_data_path = &self.path.join("data.json");
-
+    pub fn write(
+        &self,
+        summary: Summary,
+        suites: Vec<SuiteWithSummary>,
+        github_event: Option<GithubEvent>,
+    ) -> anyhow::Result<()> {
         fs::create_dir_all(&self.path)?;
-
-        let json_data = File::create(json_data_path)?;
-        let mut json_report = ConsoleJsonReport::sink_to(true, Box::new(json_data));
-        json_report.render(summary, suites)?;
-
         for (file_path, file_content) in UI_BUILD_ASSETS {
             let file_path = &self.path.join(file_path);
             debug!("Writing UI asset file: {}", file_path.to_str().unwrap());
             fs::create_dir_all(file_path.parent().expect("File has no parent dir!"))?;
             fs::write(file_path, *file_content)?;
         }
+
+        let json_data_path = &self.path.join("data.json");
+        let json_data = File::create(json_data_path)?;
+        let mut json_report = ConsoleJsonReport::sink_to(true, Box::new(json_data));
+        json_report.render(summary, suites, github_event)?;
         Ok(())
     }
 }

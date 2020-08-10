@@ -2,7 +2,8 @@ import React from 'react';
 import './App.css';
 import * as FailedSuites from './components/FailedSuites';
 import * as AllSuites from './components/AllSuites';
-import { FailedTestSuite, TestSuite, } from './dtos';
+import { FailedTestSuite, Summary, TestSuite, } from './dtos';
+import { SummaryFragment } from './components/Summary';
 
 interface AppProps {
   datasetUri: string
@@ -10,6 +11,7 @@ interface AppProps {
 interface AppState {
   failed: FailedTestSuite[];
   all: TestSuite[];
+  summary: Summary;
 }
 
 class App extends React.Component<AppProps, AppState> {
@@ -17,6 +19,13 @@ class App extends React.Component<AppProps, AppState> {
     super(props);
 
     this.state = {
+      summary: {
+        time: 0,
+        tests: 0,
+        failures: 0,
+        errors: 0,
+        skipped: 0,
+      },
       failed: [],
       all: []
     };
@@ -26,6 +35,7 @@ class App extends React.Component<AppProps, AppState> {
     fetch(this.props.datasetUri)
       .then(response => response.json())
       .then(result => this.setState({
+        summary: result.summary,
         failed: result.failed,
         all: result.allSuites,
       }));
@@ -34,7 +44,8 @@ class App extends React.Component<AppProps, AppState> {
   render() {
     return (
       <section>
-        <FailedSuites.Component failed={this.state.failed} />
+        <SummaryFragment summary={this.state.summary} />
+        {(this.state.failed.length > 0) ? <FailedSuites.Component failed={this.state.failed} /> : (<></>)}
         <AllSuites.Component all={this.state.all} />
       </section>
     );

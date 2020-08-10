@@ -1,9 +1,9 @@
 use fs::File;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json;
 use std::{fs, io::BufReader, path::Path};
 
-#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize)]
+#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize, Serialize)]
 pub struct GithubHandle(pub String);
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -24,20 +24,23 @@ impl GithubContext {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 pub struct GithubEvent {
     pub number: u32, //pr number
     pub pull_request: PullRequest,
     pub sender: GithubUser,
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 pub struct PullRequest {
     pub title: String,
     pub html_url: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all(serialize = "camelCase"))]
 pub struct GithubUser {
     pub avatar_url: String,
     pub login: GithubHandle,

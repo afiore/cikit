@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::{config::Config, github::GithubEvent};
 use anyhow::Result;
 use chrono::{Duration, NaiveDateTime};
 use fs::TestSuiteVisitor;
@@ -229,7 +229,6 @@ pub trait HasOutcome {
 pub fn read_testsuites(
     project_dir: Option<PathBuf>,
     config: &Config,
-    sort_by: Option<ReportSorting>,
 ) -> anyhow::Result<(Vec<SuiteWithSummary>, Summary)> {
     let current_dir = env::current_dir()?;
     let project_dir = project_dir.unwrap_or_else(|| current_dir);
@@ -239,17 +238,19 @@ pub fn read_testsuites(
         &config.junit.report_dir_pattern,
         &mut summary,
     )?;
-    let mut test_suites: Vec<SuiteWithSummary> = visitor.collect();
-    if let Some(ReportSorting::Time(order)) = sort_by {
-        test_suites.sort_by(|a, b| {
-            if order == SortingOrder::Asc {
-                a.summary.time.cmp(&b.summary.time)
-            } else {
-                b.summary.time.cmp(&a.summary.time)
-            }
-        })
-    }
+    let test_suites: Vec<SuiteWithSummary> = visitor.collect();
     Ok((test_suites, summary))
+}
+
+pub fn sort_testsuites(suites: &mut Vec<SuiteWithSummary>, sorting: ReportSorting) {
+    let ReportSorting::Time(order) = sorting;
+    suites.sort_by(|a, b| {
+        if order == SortingOrder::Asc {
+            a.summary.time.cmp(&b.summary.time)
+        } else {
+            b.summary.time.cmp(&a.summary.time)
+        }
+    });
 }
 
 pub enum TestSuitesOutcome {
@@ -273,12 +274,8 @@ impl TestSuitesOutcome {
         }
     }
 
-    pub fn read(
-        project_dir: Option<PathBuf>,
-        config: &Config,
-        sort_by: Option<ReportSorting>,
-    ) -> anyhow::Result<Self> {
-        let (suites, summary) = read_testsuites(project_dir, config, sort_by)?;
+    pub fn read(project_dir: Option<PathBuf>, config: &Config) -> anyhow::Result<Self> {
+        let (suites, summary) = read_testsuites(project_dir, config)?;
 
         if summary.is_successful() {
             Ok(TestSuitesOutcome::Success(summary))
@@ -302,6 +299,7 @@ pub struct FullReport {
     pub all_suites: Vec<SuiteWithSummary>,
     pub failed: Vec<FailedSuiteWithSummary>,
     pub summary: Summary,
+    pub github_event: Option<GithubEvent>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

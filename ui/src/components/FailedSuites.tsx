@@ -3,8 +3,8 @@ import { showDuration } from '../utils';
 import React from 'react';
 
 interface FragProps {
-    failedTestcases: TestCase[]
-    isExpanded: boolean
+    failedTestcases: TestCase[];
+    isExpanded: boolean;
 }
 
 const FailedTestsFragment = (props: FragProps) => {

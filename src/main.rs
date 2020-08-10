@@ -8,13 +8,16 @@ use cikit::{
 };
 
 use cikit::html::HTMLReport;
-use junit::{ReportSorting, TestSuitesOutcome};
+use junit::{ReportSorting, SortingOrder, TestSuitesOutcome};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 enum Format {
-    Text,
+    Text {
+        #[structopt(short, long, help = "time [ASC|DESC]")]
+        sort_by: Option<ReportSorting>,
+    },
     Json {
         #[structopt(short, long, help = "do not pretty print json")]
         compact: bool,
@@ -37,7 +40,9 @@ enum Format {
 
 impl Default for Format {
     fn default() -> Self {
-        Format::Text
+        Format::Text {
+            sort_by: Some(ReportSorting::Time(SortingOrder::Desc)),
+        }
     }
 }
 
@@ -47,8 +52,7 @@ enum Cmd {
     Notify { github_event_file: PathBuf },
     ///Reads the JUnit test report and renders it in muliple formats
     TestReport {
-        #[structopt(short, long, help = "time [ASC|DESC]")]
-        sort_by: Option<ReportSorting>,
+        github_event_file: Option<PathBuf>,
         #[structopt(subcommand)]
         format: Format,
     },
@@ -73,22 +77,37 @@ fn main() -> anyhow::Result<()> {
     let config = Config::from_file(opt.config_path)?;
     match cmd {
         Cmd::Notify { github_event_file } => {
-            let outcome = TestSuitesOutcome::read(opt.project_dir, &config, None)?;
+            let outcome = TestSuitesOutcome::read(opt.project_dir, &config)?;
             let ctx = GithubContext::from_file(github_event_file)?;
             let mut notifier = SlackNotifier::new(config.notifications);
             notifier.notify(outcome, ctx)
         }
-        Cmd::TestReport { sort_by, format } => {
-            let (test_suites, summary) = junit::read_testsuites(opt.project_dir, &config, sort_by)?;
+        Cmd::TestReport {
+            format,
+            github_event_file,
+        } => {
+            let (mut test_suites, summary) = junit::read_testsuites(opt.project_dir, &config)?;
+            let github_event = if let Some(github_event_file) = github_event_file {
+                Some(GithubContext::from_file(github_event_file)?.event)
+            } else {
+                None
+            };
+
             match format {
-                Format::Text => ConsoleTextReport::stdout().render(test_suites),
+                Format::Text { sort_by } => {
+                    if let Some(sorting) = sort_by {
+                        junit::sort_testsuites(&mut test_suites, sorting);
+                    }
+                    //TODO: render optional github event information
+                    ConsoleTextReport::stdout().render(test_suites, github_event)
+                }
                 Format::Json { compact } => {
-                    ConsoleJsonReport::stdout(compact).render(summary, test_suites)
+                    ConsoleJsonReport::stdout(compact).render(summary, test_suites, github_event)
                 }
                 Format::Html { output_dir, force } => {
                     let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("report"));
                     let report = HTMLReport::new(output_dir, force)?;
-                    report.write(summary, test_suites)
+                    report.write(summary, test_suites, github_event)
                 }
             }
         }

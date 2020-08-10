@@ -22,3 +22,16 @@ table {
 .failedtests td[colspan="4"] {
   padding-left: 1.5em;
 }
+
+.summary-bar > .failed {
+  height: 1em;
+  background-color: red;
+}
+.summary-bar > .skipped {
+  height: 1em;
+  background-color: yellow;
+}
+.summary-bar > .successful {
+  height: 1em;
+  background-color: lightskyblue;
+}

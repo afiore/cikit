@@ -3,7 +3,7 @@ use colored::{Color, ColoredString, Colorize};
 use io::Result;
 use std::io;
 
-use crate::junit::*;
+use crate::{github::GithubEvent, junit::*};
 
 const INDENT_STR: &str = " ";
 
@@ -18,30 +18,40 @@ pub trait ConsoleDisplay {
     fn display(&self, f: &mut Box<dyn io::Write>, depth: usize) -> Result<()>;
 }
 
+impl ConsoleDisplay for GithubEvent {
+    fn display(&self, f: &mut Box<dyn io::Write>, _depth: usize) -> Result<()> {
+        writeln!(f, "> {:<11}: {}", "PR Number", self.number)?;
+        writeln!(f, "> {:<11}: {}", "Title", self.pull_request.title)?;
+        writeln!(f, "> {:<11}: {:<4}", "URL", self.pull_request.html_url)?;
+        writeln!(f, "> {:<11}: {:<4}", "Author", self.sender.login.0)?;
+        writeln!(f, "")
+    }
+}
+
 impl ConsoleDisplay for Summary {
     fn display(&self, f: &mut Box<dyn io::Write>, _depth: usize) -> Result<()> {
         writeln!(
             f,
-            "> {:<11}:{}",
+            "> {:<11}: {}",
             "Duration",
             display::duration(self.time.to_std().unwrap())
         )?;
-        writeln!(f, "> {:<11}:{:<4}", "Tests run", self.tests)?;
+        writeln!(f, "> {:<11}: {:<4}", "Tests run", self.tests)?;
         writeln!(
             f,
-            "> {:<11}:{:<4}",
+            "> {:<11}: {:<4}",
             "Falures",
             color_if_pos(self.failures, Color::Red)
         )?;
         writeln!(
             f,
-            "> {:<11}:{:<4}",
+            "> {:<11}: {:<4}",
             "Errors",
             color_if_pos(self.errors, Color::Red)
         )?;
         writeln!(
             f,
-            "> {:<11}:{:<4}",
+            "> {:<11}: {:<4}",
             "Skipped",
             color_if_pos(self.errors, Color::Blue)
         )
@@ -75,7 +85,7 @@ impl ConsoleDisplay for TestCase {
     fn display(&self, f: &mut Box<dyn io::Write>, depth: usize) -> Result<()> {
         writeln!(
             f,
-            "{}{} {:10} {}",
+            "{}{} {:10}  {}",
             INDENT_STR.repeat(depth),
             outcome_gpyph(&self.outcome()),
             display::duration(self.time.to_std().unwrap()),
@@ -125,7 +135,14 @@ impl ConsoleTextReport {
 }
 
 impl ConsoleTextReport {
-    pub fn render(&mut self, test_suites: Vec<SuiteWithSummary>) -> anyhow::Result<()> {
+    pub fn render(
+        &mut self,
+        test_suites: Vec<SuiteWithSummary>,
+        github_event: Option<GithubEvent>,
+    ) -> anyhow::Result<()> {
+        if let Some(github_event) = github_event {
+            github_event.display(&mut self.sink, 0)?;
+        }
         for suite in &test_suites {
             suite.display(&mut self.sink, 0)?;
         }
@@ -151,6 +168,7 @@ impl ConsoleJsonReport {
         &mut self,
         summary: Summary,
         all_suites: Vec<SuiteWithSummary>,
+        github_event: Option<GithubEvent>,
     ) -> anyhow::Result<()> {
         let failed: Vec<FailedSuiteWithSummary> = all_suites
             .iter()
@@ -167,6 +185,7 @@ impl ConsoleJsonReport {
             summary,
             all_suites,
             failed,
+            github_event,
         };
 
         if self.compact {

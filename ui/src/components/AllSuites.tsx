@@ -27,8 +27,8 @@ export class Component extends React.Component<Props, any> {
                                 <tr key={suite.name + "-all-tests"}>
                                     <td>{suite.name}</td>
                                     <td>{suite.tests}</td>
-                                    <td>{suite.skipped}</td>
                                     <td>{suite.failures}</td>
+                                    <td>{suite.skipped}</td>
                                     <td>{showDuration(suite.time)}</td>
                                 </tr>
                             )

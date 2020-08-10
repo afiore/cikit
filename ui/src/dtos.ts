@@ -15,3 +15,11 @@ export interface TestSuite {
 export interface FailedTestSuite extends TestSuite {
     failedTestcases: TestCase[];
 }
+
+export interface Summary {
+    time: number;
+    tests: number;
+    failures: number;
+    errors: number;
+    skipped: number;
+}
