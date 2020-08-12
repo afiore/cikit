@@ -19,6 +19,7 @@ table {
 .failedtests {
   font-size: smaller;
 }
+
 .failedtests td[colspan="4"] {
   padding-left: 1.5em;
 }
@@ -34,4 +35,18 @@ table {
 .summary-bar > .successful {
   height: 1em;
   background-color: lightskyblue;
+}
+
+#pr-context {
+  margin-top: 1em;
+}
+#pr-context img {
+  width: 2.5em;
+  height: 2.5em;
+  float: left;
+  display: block;
+  padding-right: 0.5em;
+}
+#pr-context .title {
+  font-size: smaller;
 }

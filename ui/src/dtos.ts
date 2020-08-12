@@ -23,3 +23,20 @@ export interface Summary {
     errors: number;
     skipped: number;
 }
+
+interface PullRequest {
+    title: string;
+    htmlUrl: string;
+}
+
+interface GithubUser {
+    avatarUrl: string;
+    login: string;
+    htmlUrl: string;
+}
+
+export interface GithubContext {
+    number: number;
+    pullRequest: PullRequest,
+    sender: GithubUser
+}

@@ -2,8 +2,9 @@ import React from 'react';
 import './App.css';
 import * as FailedSuites from './components/FailedSuites';
 import * as AllSuites from './components/AllSuites';
-import { FailedTestSuite, Summary, TestSuite, } from './dtos';
+import { FailedTestSuite, GithubContext, Summary, TestSuite } from './dtos';
 import { SummaryFragment } from './components/Summary';
+import { GithubContextFragment } from './components/GithubContext';
 
 interface AppProps {
   datasetUri: string
@@ -12,6 +13,7 @@ interface AppState {
   failed: FailedTestSuite[];
   all: TestSuite[];
   summary: Summary;
+  githubEvent: GithubContext | null;
 }
 
 class App extends React.Component<AppProps, AppState> {
@@ -27,7 +29,8 @@ class App extends React.Component<AppProps, AppState> {
         skipped: 0,
       },
       failed: [],
-      all: []
+      all: [],
+      githubEvent: null
     };
   }
 
@@ -38,12 +41,14 @@ class App extends React.Component<AppProps, AppState> {
         summary: result.summary,
         failed: result.failed,
         all: result.allSuites,
+        githubEvent: result.githubEvent
       }));
   }
 
   render() {
     return (
       <section>
+        <GithubContextFragment context={this.state.githubEvent} />
         <SummaryFragment summary={this.state.summary} />
         {(this.state.failed.length > 0) ? <FailedSuites.Component failed={this.state.failed} /> : (<></>)}
         <AllSuites.Component all={this.state.all} />

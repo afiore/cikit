@@ -44,7 +44,7 @@ pub struct PullRequest {
 pub struct GithubUser {
     pub avatar_url: String,
     pub login: GithubHandle,
-    pub url: String,
+    pub html_url: String,
 }
 
 #[cfg(test)]
