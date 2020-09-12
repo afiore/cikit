@@ -1,9 +1,10 @@
-import { FailedTestSuite, TestCase, } from '../dtos';
+import { FailedTestCase as FailedTestCaseDto, FailedTestSuite } from '../dtos';
+import { Component as FailedTestCaseComponent } from './FailedTestCase';
 import { showDuration } from '../utils';
 import React from 'react';
 
 interface FragProps {
-    failedTestcases: TestCase[];
+    failedTestcases: FailedTestCaseDto[];
     isExpanded: boolean;
 }
 
@@ -11,10 +12,7 @@ const FailedTestsFragment = (props: FragProps) => {
     return (<>
         {props.isExpanded ? props.failedTestcases.map(test => {
             return (
-                <tr key={test.name} className={"failedtests"}>
-                    <td colSpan={4}>{test.name}</td>
-                    <td>{showDuration(test.time)}</td>
-                </tr>)
+                <FailedTestCaseComponent testCase={test} />)
         }) : null}
 
     </>)
@@ -64,7 +62,7 @@ export class Component extends React.Component<Props, State> {
                                     <tr key={suite.name}>
                                         <td>{suite.name}</td>
                                         <td>{suite.tests}</td>
-                                        <td><button title="toggle test cases" onClick={() => this.handleOnClick(suite.name)}>{suite.failures}</button></td>
+                                        <td className="failedcount"><button title="toggle test cases" onClick={() => this.handleOnClick(suite.name)}>{suite.failures}</button></td>
                                         <td>{suite.skipped}</td>
                                         <td>{showDuration(suite.time)}</td>
                                     </tr>

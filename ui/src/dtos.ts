@@ -1,3 +1,13 @@
+export interface Failure {
+    type: String;
+    stackTrace?: String;
+    message?: String;
+}
+
+export interface FailedTestCase extends TestCase {
+    failure: Failure;
+}
+
 export interface TestCase {
     name: string;
     time: number;
@@ -13,7 +23,7 @@ export interface TestSuite {
 }
 
 export interface FailedTestSuite extends TestSuite {
-    failedTestcases: TestCase[];
+    failedTestcases: FailedTestCase[];
 }
 
 export interface Summary {

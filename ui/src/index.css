@@ -24,6 +24,11 @@ table {
   padding-left: 1.5em;
 }
 
+button {
+  padding: 0.5em;
+  min-width: 5em;
+}
+
 .summary-bar > .failed {
   height: 1em;
   background-color: red;
@@ -49,4 +54,13 @@ table {
 }
 #pr-context .title {
   font-size: smaller;
+}
+
+.failedcount button {
+  margin-left: 15%;
+}
+
+.failedtests button {
+  font-size: smaller;
+  margin-right: 1em;
 }

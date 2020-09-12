@@ -1,7 +1,5 @@
 import React from 'react';
-import { isNumericLiteral } from 'typescript';
 import { GithubContext } from '../dtos';
-
 
 interface Props {
     context: GithubContext | null;
