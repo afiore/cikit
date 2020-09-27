@@ -1,16 +1,26 @@
 ## CI Kit
 
-Playground project to learn Rust while building a minimum viable CI reporting experience.
-
-### Status
-
-🚧 This is a work in progress and is not feature complete yet!
+Playground project using Rust to build a minimum viable CI reporting tool.
 
 ### Goals
 
 - Provide a minimal but functional UI to display JUnit test reports both through the CLI and as an HTML document.
-- Notify test outcome through various channels: i.e. slack web-hooks, github comments, etc.
+- Notify test outcome through various channels: i.e. slack web-hooks, github comments/annotations, email, etc.
 - Have fun!
+
+### Development status
+
+🚧 This is a work in progress and is not feature complete yet!
+
+A rudimentary React-based HTML viewer is already implemented:
+
+![cikit HTML report rendering](images/cikit-html.gif)
+
+_Note:_ in order to view the generated reports, you will need to run a webserver using the `report` folder as the document root (e.g `cd report && python2 -m SimpleHTTPServer 8000`).
+
+Also, reports can be rendered in the console using the even more crude _text_ format:
+
+![cikit text report rendering](images/cikit-console.gif)
 
 ### Usage
 
@@ -39,13 +49,15 @@ SUBCOMMANDS:
 
 ### Building and running
 
-Assuming you have `rustup` installed with the default toolchain, simply:
+In order to statically embed a small set of web assets into its executable, `cikit`
+wraps its UI build (React/TypeScript) into a Cargo build. 
+Assuming you have both `npm` and `rustup` (default toolchain) install, you should be able to build by simply running:
 
 `cargo build`
 
-and 
+and then
 
-`cargo test` to run the unit tests.
+`cargo test` to execute the test suite.
 
 Finally, you can iteratively recompile and run the program by prefixing the normal executable call with `cargo run --`:
 
