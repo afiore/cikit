@@ -10,10 +10,8 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - run: "npm install typescript"
-        working-directory: ui
       - uses: actions-rs/cargo@v1
-        # env:
-        #   CI: "false"
+        env:
+          CI: "false"
         with:
           command: test
