@@ -1,0 +1,17 @@
+name: CI
+on:
+  pull_request:
+jobs:
+  Build:
+    if: github.event.pull_request.merged == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        env:
+          CI: "false"
+        with:
+          command: test
