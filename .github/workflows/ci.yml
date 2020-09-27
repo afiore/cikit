@@ -7,10 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
-      - run: npm install --global typescript
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - run: "npm install typescript"
+        working-directory: ui
       - uses: actions-rs/cargo@v1
+        # env:
+        #   CI: "false"
         with:
           command: test
