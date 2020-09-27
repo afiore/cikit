@@ -51,7 +51,7 @@ SUBCOMMANDS:
 
 In order to statically embed a small set of web assets into its executable, `cikit`
 wraps its UI build (React/TypeScript) into a Cargo build. 
-Assuming you have both `npm` and `rustup` (default toolchain) install, you should be able to build by simply running:
+Assuming you have both `npm` and `rustup` (default toolchain) installed, you should be able to build the project in one go by simply running:
 
 `cargo build`
 
