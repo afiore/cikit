@@ -109,10 +109,10 @@ fn main() -> Result<(), BuildError> {
     .unwrap();
 
     Command::new("npm")
-        .args(&["install", "--save", "typescript"])
+        .args(&["install", "--save-dev", "typescript"])
         .current_dir(ui_dir.clone())
         .spawn()
-        .expect("failed to run 'npm install --save typescript'");
+        .expect("failed to run 'npm install --save-dev typescript'");
 
     Command::new("npm")
         .args(&["install"])
