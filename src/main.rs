@@ -9,6 +9,7 @@ use cikit::{
 
 use cikit::html::HTMLReport;
 use junit::{ReportSorting, SortingOrder, TestSuitesOutcome};
+use log::warn;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -79,8 +80,14 @@ fn main() -> anyhow::Result<()> {
         Cmd::Notify { github_event_file } => {
             let outcome = TestSuitesOutcome::read(opt.project_dir, &config)?;
             let ctx = GithubContext::from_file(github_event_file)?;
-            let mut notifier = SlackNotifier::new(config.notifications);
-            notifier.notify(outcome, ctx)
+            if let Some(slack_config) = config.notifications.slack {
+                let mut notifier = SlackNotifier::new(slack_config);
+                notifier.notify(outcome, ctx)
+            } else {
+                Ok(warn!(
+                    "No configuration found for Slack notifications. Doing nothing"
+                ))
+            }
         }
         Cmd::TestReport {
             format,
@@ -98,7 +105,6 @@ fn main() -> anyhow::Result<()> {
                     if let Some(sorting) = sort_by {
                         junit::sort_testsuites(&mut test_suites, sorting);
                     }
-                    //TODO: render optional github event information
                     ConsoleTextReport::stdout().render(test_suites, github_event)
                 }
                 Format::Json { compact } => {

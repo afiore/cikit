@@ -1,8 +1,8 @@
-use crate::config::Notifications;
+use crate::config;
 use crate::github::GithubContext;
 use crate::junit::{self, FailedTestSuite, Summary, TestSuitesOutcome};
 use crate::notify::Notifier;
-use serde::Deserialize;
+use serde_derive::Deserialize;
 
 use std::{fmt::Display, io::Read};
 
@@ -10,6 +10,7 @@ use log::warn;
 use serde::Serialize;
 
 #[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize)]
+#[serde(transparent)]
 pub struct SlackUserId(pub String);
 
 impl Display for SlackUserId {
@@ -100,12 +101,12 @@ impl Text {
 }
 
 pub struct SlackNotifier {
-    config: Notifications,
+    config: config::SlackNotifications,
     client: reqwest::blocking::Client,
 }
 
 impl SlackNotifier {
-    pub fn new(config: Notifications) -> Self {
+    pub fn new(config: config::SlackNotifications) -> Self {
         SlackNotifier {
             config,
             client: reqwest::blocking::Client::new(),
@@ -118,7 +119,7 @@ impl Notifier for SlackNotifier {
     type CIContext = GithubContext;
     fn notify(&mut self, event: Self::Event, ctx: Self::CIContext) -> anyhow::Result<()> {
         match &self.config {
-            Notifications::Slack {
+            config::SlackNotifications {
                 user_handles,
                 webhook_url,
             } => {
@@ -199,7 +200,7 @@ mod tests {
         assert_eq!(
             json!({
                 "type": "plain_text",
-                "text": "some text",
+                "text": "some text"
             }),
             serde_json::to_value(&text).unwrap()
         )

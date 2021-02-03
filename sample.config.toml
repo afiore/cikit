@@ -1,8 +1,9 @@
 [notifications]
-type = "Slack"
+
+[notifications.slack]
 webhook_url = "https://hooks.slack.com/services/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"
 
-[notifications.user_handles]
+[notifications.slack.user_handles]
 user_1 = "userone"
 user_2 = "usertwo"
 

@@ -4,12 +4,18 @@ use std::fs;
 use std::{collections::BTreeMap, io, path::Path};
 
 #[derive(PartialEq, Debug, Deserialize)]
-#[serde(tag = "type")]
-pub enum Notifications {
-    Slack {
-        user_handles: BTreeMap<GithubHandle, SlackUserId>,
-        webhook_url: String,
-    },
+pub struct Notifications {
+    pub slack: Option<SlackNotifications>,
+}
+#[derive(PartialEq, Debug, Deserialize)]
+pub struct SlackNotifications {
+    pub user_handles: BTreeMap<GithubHandle, SlackUserId>,
+    pub webhook_url: String,
+}
+
+#[derive(PartialEq, Debug, Deserialize)]
+pub struct GithubNotifications {
+    pub token: String,
 }
 
 #[derive(PartialEq, Debug, Deserialize)]
@@ -38,10 +44,10 @@ mod tests {
         let config: Config = toml::from_str(
             r#"
         [notifications]
-        type = "Slack"
+        [notifications.slack]
         webhook_url = "https://hooks.slack.com/services/x"
 
-        [notifications.user_handles]
+        [notifications.slack.user_handles]
         user_1 = "U024BE7LH"
         user_2 = "U058ZU1KY"
 
@@ -63,9 +69,11 @@ mod tests {
         assert_eq!(
             config,
             Config {
-                notifications: Notifications::Slack {
-                    webhook_url: "https://hooks.slack.com/services/x".to_owned(),
-                    user_handles: handles
+                notifications: Notifications {
+                    slack: Some(SlackNotifications {
+                        webhook_url: "https://hooks.slack.com/services/x".to_owned(),
+                        user_handles: handles
+                    })
                 },
                 junit: Junit {
                     report_dir_pattern: "**/target/**/test-reports".to_owned()

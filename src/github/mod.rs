@@ -1,9 +1,10 @@
 use fs::File;
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::{fs, io::BufReader, path::Path};
 
 #[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct GithubHandle(pub String);
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -37,6 +38,7 @@ pub struct GithubEvent {
 pub struct PullRequest {
     pub title: String,
     pub html_url: String,
+    pub commits_url: String,
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
@@ -59,3 +61,5 @@ mod tests {
         let _: GithubContext = serde_json::from_str(github_event_json).unwrap();
     }
 }
+
+pub mod notifier;
