@@ -24,6 +24,7 @@ humantime = "2.0"
 colored = "2.0.0"
 atty = "0.2"
 include_dir = "0.6.0"
+openssl = { version = "0.10", features = ["vendored"] }
 
 [dev-dependencies]
 uuid =  { version = "0.8", features = ["serde", "v4"] }
