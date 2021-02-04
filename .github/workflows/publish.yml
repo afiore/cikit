@@ -16,7 +16,7 @@ jobs:
         with:
           toolchain: stable
       - name: Build release artefact
-        uses: actions-rs/cargo@v2
+        uses: actions-rs/cargo@v1.0.3
         env:
           CI: "false"
         with:
