@@ -20,7 +20,8 @@ jobs:
         env:
           CI: "false"
         with:
-          command: build --release
+          command: build
+          args: --release
       - name: Build Docker image
         run: "docker build . -t afiore/cikit:${{ github.run_id }}"
       - name: List Docker image
