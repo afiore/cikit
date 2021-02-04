@@ -1,0 +1,29 @@
+name: Publish
+on:
+  #push:
+  workflow_dispatch:
+jobs:
+  Publish:
+    #if: github.ref == 'refs/heads/master' || startsWith(github.ref,'refs/heads/release/')
+    runs-on: ubuntu-latest
+    env:
+      github_run_id: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/checkout@v1
+      - name: Install stable Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build release artefact
+        uses: actions-rs/cargo@v2
+        env:
+          CI: "false"
+        with:
+          command: build --release
+      - name: Build Docker image
+        run: "docker build . -t afiore/cikit:${{ github.run_id }}"
+      - name: List Docker image
+        run: docker image ls
+      - name: Run cikit docker image
+        run: docker run cikit --help
