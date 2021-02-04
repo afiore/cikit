@@ -27,4 +27,4 @@ jobs:
       - name: List Docker image
         run: docker image ls
       - name: Run cikit docker image
-        run: docker run afiore/cikit --help
+        run: docker run afiore/cikit:${{ github.run_id }} --help
