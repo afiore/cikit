@@ -11,6 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - uses: actions/checkout@v1
+      - name: Install Openssl
+        run: sudo apt-get install libssl-dev
       - name: Install stable Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
