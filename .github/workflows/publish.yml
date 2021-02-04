@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - uses: actions/checkout@v1
-      - name: Install Openssl
+      - name: Install build dependencies
         run: sudo apt-get install libssl-dev musl-tools
       - name: Install stable Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -26,9 +26,9 @@ jobs:
         with:
           command: build
           args: --target x86_64-unknown-linux-musl #--release
-#      - name: Build Docker image
-#        run: "docker build . -t afiore/cikit:${{ github.run_id }}"
-#      - name: List Docker image
-#        run: docker image ls
-#      - name: Run cikit docker image
-#        run: docker run afiore/cikit:${{ github.run_id }} --help
+      - name: Build Docker image
+        run: "docker build . -t afiore/cikit:${{ github.run_id }}"
+      - name: List Docker image
+        run: docker image ls
+      - name: Run cikit docker image
+        run: docker run afiore/cikit:${{ github.run_id }} --help
