@@ -7,6 +7,11 @@ use std::{fs, io::BufReader, path::Path};
 #[serde(transparent)]
 pub struct GithubHandle(pub String);
 
+#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize, Serialize)]
+#[serde(transparent)]
+/// The github owner and repository (slash separated)
+pub struct OwnerRepo(pub String);
+
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct GithubContext {
     pub token: String,
@@ -14,6 +19,7 @@ pub struct GithubContext {
     pub run_id: String,
     pub actor: GithubHandle,
     pub event: GithubEvent,
+    pub repository: OwnerRepo,
 }
 
 impl GithubContext {
