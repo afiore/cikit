@@ -6,7 +6,7 @@ import * as serviceWorker from './serviceWorker';
 
 ReactDOM.render(
   <React.StrictMode>
-    <App datasetUri="/data.json" />
+    <App datasetUri="./data.json" />
   </React.StrictMode>,
   document.getElementById('root')
 );
