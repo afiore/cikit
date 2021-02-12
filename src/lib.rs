@@ -14,3 +14,4 @@ pub mod html;
 pub mod junit;
 pub mod notify;
 pub mod slack;
+pub mod gcs;

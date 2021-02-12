@@ -35,14 +35,8 @@ impl ReportVisitor {
 
         for path in paths {
             if let Ok(path) = path {
-                if path.is_dir() {
-                    for entry in fs::read_dir(path)? {
-                        if let Ok(file) = entry {
-                            if file.path().extension() == Some(OsStr::new("xml")) {
-                                report_files.push(file.path());
-                            }
-                        }
-                    }
+                if path.is_file() && path.extension() == Some(OsStr::new("xml")) {
+                    report_files.push(path);
                 }
             }
         }

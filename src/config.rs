@@ -1,4 +1,4 @@
-use crate::{github::GithubHandle, slack::SlackUserId};
+use crate::{gcs::PublisherConfig, github::GithubHandle, slack::SlackUserId};
 use serde_derive::Deserialize;
 use std::fs;
 use std::{collections::BTreeMap, io, path::Path};
@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, io, path::Path};
 #[derive(PartialEq, Debug, Deserialize)]
 pub struct Notifications {
     pub slack: Option<SlackNotifications>,
+    pub google_cloud_storage: Option<PublisherConfig>,
 }
 #[derive(PartialEq, Debug, Deserialize)]
 pub struct SlackNotifications {
@@ -38,6 +39,8 @@ impl Config {
 }
 
 mod tests {
+    use crate::gcs::*;
+
     #[test]
     fn parse_from_toml() {
         use super::*;
@@ -47,9 +50,14 @@ mod tests {
         [notifications.slack]
         webhook_url = "https://hooks.slack.com/services/x"
 
+
         [notifications.slack.user_handles]
         user_1 = "U024BE7LH"
         user_2 = "U058ZU1KY"
+
+        [notifications.google_cloud_storage]
+        bucket = "my-test-reports"
+
 
         [junit]
         report_dir_pattern = "**/target/**/test-reports"
@@ -73,6 +81,10 @@ mod tests {
                     slack: Some(SlackNotifications {
                         webhook_url: "https://hooks.slack.com/services/x".to_owned(),
                         user_handles: handles
+                    },),
+
+                    google_cloud_storage: Some(PublisherConfig {
+                        bucket: BucketName("my-test-reports".to_owned())
                     })
                 },
                 junit: Junit {
