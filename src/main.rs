@@ -1,4 +1,5 @@
 use cikit::config::Config;
+use cikit::gcs;
 use cikit::junit;
 use cikit::{
     console::{ConsoleJsonReport, ConsoleTextReport},
@@ -7,11 +8,28 @@ use cikit::{
     slack::SlackNotifier,
 };
 
+use anyhow::{format_err, Error};
 use cikit::html::HTMLReport;
 use junit::{ReportSorting, SortingOrder, TestSuitesOutcome};
 use log::warn;
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr, todo};
 use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+enum ReportPublication {
+    GoogleCloudStorage,
+}
+
+impl FromStr for ReportPublication {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "gcs" => Ok(ReportPublication::GoogleCloudStorage),
+            _ => Err(format_err!("invalid ReportPublication {}", s)),
+        }
+    }
+}
 
 #[derive(Debug, StructOpt)]
 enum Format {
@@ -36,6 +54,8 @@ enum Format {
             help = "overwrite the output directory content if the directory exists"
         )]
         force: bool,
+        #[structopt(short, long, help = "report publication strategy")]
+        publish_to: Option<ReportPublication>,
     },
 }
 
@@ -94,11 +114,14 @@ fn main() -> anyhow::Result<()> {
             github_event_file,
         } => {
             let (mut test_suites, summary) = junit::read_testsuites(opt.project_dir, &config)?;
-            let github_event = if let Some(github_event_file) = github_event_file {
-                Some(GithubContext::from_file(github_event_file)?.event)
+            let github_ctx = if let Some(github_event_file) = github_event_file {
+                GithubContext::from_file(github_event_file).ok()
             } else {
                 None
             };
+
+            let github_run_id = github_ctx.as_ref().map(|c| c.run_id.clone());
+            let github_event = github_ctx.map(|c| c.event);
 
             match format {
                 Format::Text { sort_by } => {
@@ -110,10 +133,26 @@ fn main() -> anyhow::Result<()> {
                 Format::Json { compact } => {
                     ConsoleJsonReport::stdout(compact).render(summary, test_suites, github_event)
                 }
-                Format::Html { output_dir, force } => {
+                Format::Html {
+                    output_dir,
+                    force,
+                    publish_to,
+                } => {
+                    //TODO: avoid PathBuf, use AsRef!
                     let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("report"));
-                    let report = HTMLReport::new(output_dir, force)?;
-                    report.write(summary, test_suites, github_event)
+                    let report = HTMLReport::new(output_dir.clone(), force)?;
+                    report.write(summary, test_suites, github_event)?;
+
+                    if let Some(((ReportPublication::GoogleCloudStorage, config), github_run_id)) =
+                        publish_to
+                            .zip(config.notifications.google_cloud_storage)
+                            .zip(github_run_id)
+                    {
+                        let gcs_publisher =
+                            gcs::publisher::GCSPublisher::new(config, output_dir, github_run_id)?;
+                        gcs_publisher.publish()?;
+                    }
+                    Ok(())
                 }
             }
         }

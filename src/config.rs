@@ -50,14 +50,12 @@ mod tests {
         [notifications.slack]
         webhook_url = "https://hooks.slack.com/services/x"
 
-
         [notifications.slack.user_handles]
         user_1 = "U024BE7LH"
         user_2 = "U058ZU1KY"
 
         [notifications.google_cloud_storage]
         bucket = "my-test-reports"
-
 
         [junit]
         report_dir_pattern = "**/target/**/test-reports"
