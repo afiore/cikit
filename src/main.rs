@@ -8,11 +8,11 @@ use cikit::{
     slack::SlackNotifier,
 };
 
-use anyhow::{format_err, Error};
+use anyhow::format_err;
 use cikit::html::HTMLReport;
 use junit::{ReportSorting, SortingOrder, TestSuitesOutcome};
 use log::warn;
-use std::{path::PathBuf, str::FromStr, todo};
+use std::{path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -25,7 +25,7 @@ impl FromStr for ReportPublication {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "gcs" => Ok(ReportPublication::GoogleCloudStorage),
+            "gcs" | "google-cloud-storage" => Ok(ReportPublication::GoogleCloudStorage),
             _ => Err(format_err!("invalid ReportPublication {}", s)),
         }
     }
@@ -54,7 +54,11 @@ enum Format {
             help = "overwrite the output directory content if the directory exists"
         )]
         force: bool,
-        #[structopt(short, long, help = "report publication strategy")]
+        #[structopt(
+            short,
+            long,
+            help = "report publication strategy. Currently, the only one implemented is `google-cloud-storage`"
+        )]
         publish_to: Option<ReportPublication>,
     },
 }

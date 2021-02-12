@@ -39,7 +39,7 @@ impl Config {
 }
 
 mod tests {
-    use crate::gcs::*;
+    use crate::gcs::BucketName;
 
     #[test]
     fn parse_from_toml() {
