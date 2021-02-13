@@ -11,7 +11,7 @@ use cikit::{
 use anyhow::format_err;
 use cikit::html::HTMLReport;
 use junit::{ReportSorting, SortingOrder, TestSuitesOutcome};
-use log::warn;
+use log::{info, warn};
 use std::{path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 
@@ -154,7 +154,10 @@ fn main() -> anyhow::Result<()> {
                     {
                         let gcs_publisher =
                             gcs::publisher::GCSPublisher::new(config, output_dir, github_run_id)?;
-                        gcs_publisher.publish()?;
+
+                        if let Some(report_url) = gcs_publisher.publish()? {
+                            info!("report published at {}", report_url);
+                        }
                     }
                     Ok(())
                 }

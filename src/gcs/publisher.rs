@@ -1,14 +1,18 @@
 use std::{
+    ffi::OsStr,
     io::Read,
     path::{Path, PathBuf},
 };
 
+use cloud_storage::{
+    bucket::{IamPolicy, IamRole, PrimitiveIamRole},
+    GoogleError,
+};
 use glob::glob;
 use log::debug;
 
 use super::PublisherConfig;
 use anyhow::Result;
-use mime::Mime;
 use std::fs::File;
 
 pub struct GCSPublisher {
@@ -18,22 +22,27 @@ pub struct GCSPublisher {
     github_run_id: String,
 }
 
-fn detect_mime<P: AsRef<Path>>(path: P) -> Mime {
+fn detect_mime<P: AsRef<Path>>(path: P, buf: &[u8]) -> String {
     if let Some(ext) = path.as_ref().extension().and_then(|s| s.to_str()) {
         match ext {
-            "html" => mime::TEXT_HTML,
-            "json" => mime::APPLICATION_JSON,
-            "js" => mime::APPLICATION_JAVASCRIPT,
-            "css" => mime::TEXT_CSS,
-            "png" => mime::IMAGE_PNG,
-            "gif" => mime::IMAGE_GIF,
-            "jpg" | "jpeg" => mime::IMAGE_JPEG,
-            "ico" => mime::IMAGE_BMP,
-
-            _ => mime::APPLICATION_OCTET_STREAM,
+            "html" => "text/html".to_owned(),
+            "json" => "application/json".to_owned(),
+            "js" => "application/javascript".to_owned(),
+            "css" => "text/css".to_owned(),
+            _ => tree_magic::from_u8(buf),
         }
     } else {
-        mime::APPLICATION_OCTET_STREAM
+        tree_magic::from_u8(buf)
+    }
+}
+
+fn is_view_role(role: &IamRole) -> bool {
+    use cloud_storage::bucket::*;
+    match role {
+        IamRole::Legacy(LegacyIamRole::LegacyBucketReader) => true,
+        IamRole::Primitive(PrimitiveIamRole::Viewer) => true,
+        IamRole::Standard(cloud_storage::bucket::StandardIamRole::ObjectViewer) => true,
+        _ => false,
     }
 }
 
@@ -64,18 +73,35 @@ impl GCSPublisher {
         })
     }
 
-    //TODO: parallelise upload using Futures
+    // TODO: check bucket IAM policy bindings to determine
+    // if the bucket is public. If so, return index.html URL
+    // as an optional result value
+    pub fn publish(self) -> Result<Option<String>> {
+        let bucket = cloud_storage::Bucket::read_sync(&self.config.bucket.0)?;
+        let iam_policy: IamPolicy = bucket.get_iam_policy_sync()?;
+        let bucket_is_public = iam_policy
+            .bindings
+            .iter()
+            .position(|b| b.members.contains(&"allUsers".to_owned()) && is_view_role(&b.role))
+            .is_some();
+        let mut index_html_found = false;
 
-    pub fn publish(self) -> Result<()> {
-        let github_run_id = self.github_run_id;
         for path in self.report_files {
             let mut file = File::open(&path)?;
             let mut buf: Vec<u8> = Vec::new();
+
             file.read_to_end(&mut buf)?;
 
-            let mime_type = detect_mime(&path);
-            let prefix = Path::new(&github_run_id);
+            //TODO: use magic tree for binary files, relying on extension only for textual formats
+            // debug!("magic tree inferred type {}", tree_magic::from_u8(&buf));
+            let mime_type = detect_mime(&path, &buf);
+            let prefix = Path::new(&self.github_run_id);
             let key = path.strip_prefix(self.report_dir.clone())?;
+
+            if key.file_name() == Some(OsStr::new("index.html")) {
+                index_html_found = true;
+            }
+
             let key = prefix.join(key.to_str().unwrap());
 
             debug!(
@@ -93,6 +119,15 @@ impl GCSPublisher {
                 &mime_type.to_string(),
             )?;
         }
-        Ok(())
+
+        let report_url = if bucket_is_public && index_html_found {
+            Some(format!(
+                "https://storage.googleapis.com/{}/{}/index.html",
+                self.config.bucket.0, self.github_run_id
+            ))
+        } else {
+            None
+        };
+        Ok(report_url)
     }
 }
