@@ -71,7 +71,7 @@ impl GCSPublisher {
         for path in self.report_files {
             let mut file = File::open(&path)?;
             let mut buf: Vec<u8> = Vec::new();
-            file.read(&mut buf)?;
+            file.read_to_end(&mut buf)?;
 
             let mime_type = detect_mime(&path);
             let prefix = Path::new(&github_run_id);
@@ -85,6 +85,7 @@ impl GCSPublisher {
                 &self.config.bucket.0,
                 key.display(),
             );
+
             cloud_storage::Object::create_sync(
                 &self.config.bucket.0,
                 buf,
