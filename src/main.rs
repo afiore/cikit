@@ -155,9 +155,7 @@ fn main() -> anyhow::Result<()> {
                         let gcs_publisher =
                             gcs::publisher::GCSPublisher::new(config, output_dir, github_run_id)?;
 
-                        if let Some(report_url) = gcs_publisher.publish()? {
-                            info!("report published at {}", report_url);
-                        }
+                        gcs_publisher.publish()?
                     }
                     Ok(())
                 }

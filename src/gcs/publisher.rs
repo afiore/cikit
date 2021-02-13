@@ -1,13 +1,9 @@
 use std::{
-    ffi::OsStr,
     io::Read,
     path::{Path, PathBuf},
 };
 
-use cloud_storage::{
-    bucket::{IamPolicy, IamRole, PrimitiveIamRole},
-    GoogleError,
-};
+use cloud_storage::bucket::IamRole;
 use glob::glob;
 use log::debug;
 
@@ -76,16 +72,7 @@ impl GCSPublisher {
     // TODO: check bucket IAM policy bindings to determine
     // if the bucket is public. If so, return index.html URL
     // as an optional result value
-    pub fn publish(self) -> Result<Option<String>> {
-        let bucket = cloud_storage::Bucket::read_sync(&self.config.bucket.0)?;
-        let iam_policy: IamPolicy = bucket.get_iam_policy_sync()?;
-        let bucket_is_public = iam_policy
-            .bindings
-            .iter()
-            .position(|b| b.members.contains(&"allUsers".to_owned()) && is_view_role(&b.role))
-            .is_some();
-        let mut index_html_found = false;
-
+    pub fn publish(self) -> Result<()> {
         for path in self.report_files {
             let mut file = File::open(&path)?;
             let mut buf: Vec<u8> = Vec::new();
@@ -97,11 +84,6 @@ impl GCSPublisher {
             let mime_type = detect_mime(&path, &buf);
             let prefix = Path::new(&self.github_run_id);
             let key = path.strip_prefix(self.report_dir.clone())?;
-
-            if key.file_name() == Some(OsStr::new("index.html")) {
-                index_html_found = true;
-            }
-
             let key = prefix.join(key.to_str().unwrap());
 
             debug!(
@@ -119,15 +101,6 @@ impl GCSPublisher {
                 &mime_type.to_string(),
             )?;
         }
-
-        let report_url = if bucket_is_public && index_html_found {
-            Some(format!(
-                "https://storage.googleapis.com/{}/{}/index.html",
-                self.config.bucket.0, self.github_run_id
-            ))
-        } else {
-            None
-        };
-        Ok(report_url)
+        Ok(())
     }
 }
