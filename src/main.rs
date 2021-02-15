@@ -4,32 +4,13 @@ use cikit::junit;
 use cikit::{
     console::{ConsoleJsonReport, ConsoleTextReport},
     github::GithubContext,
-    notify::Notifier,
-    slack::SlackNotifier,
 };
 
-use anyhow::format_err;
 use cikit::html::HTMLReport;
-use junit::{ReportSorting, SortingOrder, TestSuitesOutcome};
-use log::warn;
-use std::{path::PathBuf, str::FromStr};
+use junit::{ReportSorting, SortingOrder};
+
+use std::path::PathBuf;
 use structopt::StructOpt;
-
-#[derive(Debug, StructOpt)]
-enum ReportPublication {
-    GoogleCloudStorage,
-}
-
-impl FromStr for ReportPublication {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "gcs" | "google-cloud-storage" => Ok(ReportPublication::GoogleCloudStorage),
-            _ => Err(format_err!("invalid ReportPublication {}", s)),
-        }
-    }
-}
 
 #[derive(Debug, StructOpt)]
 enum Format {
@@ -54,13 +35,6 @@ enum Format {
             help = "overwrite the output directory content if the directory exists"
         )]
         force: bool,
-        #[structopt(
-            short,
-            long,
-            help = "report publication strategy. Currently, the only one implemented is `google-cloud-storage`"
-        )]
-        //TODO: move to configuration
-        publish_to: Option<ReportPublication>,
     },
 }
 
@@ -74,8 +48,6 @@ impl Default for Format {
 
 #[derive(Debug, StructOpt)]
 enum Cmd {
-    ///Notifies the build outcome via Slack
-    Notify { github_event_file: PathBuf },
     ///Reads the JUnit test report and renders it in muliple formats
     TestReport {
         github_event_file: Option<PathBuf>,
@@ -102,18 +74,6 @@ fn main() -> anyhow::Result<()> {
     let cmd = opt.cmd;
     let config = Config::from_file(opt.config_path)?;
     match cmd {
-        Cmd::Notify { github_event_file } => {
-            let outcome = TestSuitesOutcome::read(opt.project_dir, &config)?;
-            let ctx = GithubContext::from_file(github_event_file)?;
-            if let Some(slack_config) = config.notifications.slack {
-                let mut notifier = SlackNotifier::new(slack_config);
-                notifier.notify(outcome, ctx)
-            } else {
-                Ok(warn!(
-                    "No configuration found for Slack notifications. Doing nothing"
-                ))
-            }
-        }
         Cmd::TestReport {
             format,
             github_event_file,
@@ -138,22 +98,14 @@ fn main() -> anyhow::Result<()> {
                 Format::Json { compact } => {
                     ConsoleJsonReport::stdout(compact).render(summary, test_suites, github_event)
                 }
-                Format::Html {
-                    output_dir,
-                    force,
-                    publish_to,
-                } => {
+                Format::Html { output_dir, force } => {
                     //FIXME: avoid PathBuf, use AsRef!
                     let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("report"));
                     let report = HTMLReport::new(output_dir.clone(), force)?;
                     report.write(summary, test_suites, github_event)?;
 
-                    let _report_url = if let Some((
-                        (ReportPublication::GoogleCloudStorage, config),
-                        github_run_id,
-                    )) = publish_to
-                        .zip(config.notifications.google_cloud_storage)
-                        .zip(github_run_id)
+                    let _report_url = if let Some((config, github_run_id)) =
+                        config.notifications.google_cloud_storage.zip(github_run_id)
                     {
                         let gcs_publisher =
                             gcs::publisher::GCSPublisher::new(config, output_dir, github_run_id)?;
