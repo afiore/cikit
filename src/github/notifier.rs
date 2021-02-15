@@ -20,12 +20,12 @@ impl GithubCommentNotifier {
 
 impl Notifier for GithubCommentNotifier {
     type Event = TestSuitesOutcome;
-    type CIContext = GithubContext;
+    type CIContext = (GithubContext, Option<String>);
 
-    //TODO: allow deletion of existing CI comments
     fn notify(&mut self, event: Self::Event, ctx: Self::CIContext) -> anyhow::Result<()> {
+        let (ctx, report_url) = ctx;
         let mut response_body = String::new();
-        let comment = match event {
+        let mut comment = match event {
             TestSuitesOutcome::Success(_) => ":heavy_check_mark: Test suite passed!".to_owned(),
             TestSuitesOutcome::Failure {
                 failed_testsuites, ..
@@ -34,6 +34,9 @@ impl Notifier for GithubCommentNotifier {
                 failed_testsuites.len()
             ),
         };
+        if let Some(report_url) = report_url {
+            comment.push_str(&format!(":bookmark_tabs: [Test report]({})", report_url));
+        }
 
         let endpoint_url = format!("/repos/{}/commits/{}/comments", ctx.repository.0, ctx.sha);
         let payload = serde_json::json!({ "body": comment });

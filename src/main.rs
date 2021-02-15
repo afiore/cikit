@@ -11,7 +11,7 @@ use cikit::{
 use anyhow::format_err;
 use cikit::html::HTMLReport;
 use junit::{ReportSorting, SortingOrder, TestSuitesOutcome};
-use log::{info, warn};
+use log::warn;
 use std::{path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 
@@ -59,6 +59,7 @@ enum Format {
             long,
             help = "report publication strategy. Currently, the only one implemented is `google-cloud-storage`"
         )]
+        //TODO: move to configuration
         publish_to: Option<ReportPublication>,
     },
 }
@@ -142,21 +143,26 @@ fn main() -> anyhow::Result<()> {
                     force,
                     publish_to,
                 } => {
-                    //TODO: avoid PathBuf, use AsRef!
+                    //FIXME: avoid PathBuf, use AsRef!
                     let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("report"));
                     let report = HTMLReport::new(output_dir.clone(), force)?;
                     report.write(summary, test_suites, github_event)?;
 
-                    if let Some(((ReportPublication::GoogleCloudStorage, config), github_run_id)) =
-                        publish_to
-                            .zip(config.notifications.google_cloud_storage)
-                            .zip(github_run_id)
+                    let _report_url = if let Some((
+                        (ReportPublication::GoogleCloudStorage, config),
+                        github_run_id,
+                    )) = publish_to
+                        .zip(config.notifications.google_cloud_storage)
+                        .zip(github_run_id)
                     {
                         let gcs_publisher =
                             gcs::publisher::GCSPublisher::new(config, output_dir, github_run_id)?;
 
-                        gcs_publisher.publish()?
-                    }
+                        Some(gcs_publisher.publish()?)
+                    } else {
+                        None
+                    };
+
                     Ok(())
                 }
             }

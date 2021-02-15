@@ -559,7 +559,7 @@ com.example
     }
     #[test]
     fn failed_testsuite() {
-        let report_dir_pattern = "**/testreports";
+        let report_dir_pattern = "**/testreports/*";
         let mut dir = env::temp_dir();
         let mut failed_suites: Vec<FailedTestSuite> = Vec::new();
 

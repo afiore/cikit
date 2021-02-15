@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+//TODO: delete this trait as it brings no value!
 pub trait Notifier {
     type Event;
     type CIContext;

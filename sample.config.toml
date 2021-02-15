@@ -12,6 +12,6 @@ bucket = "cikit"
 #creds will be read from `SERVICE_ACCOUNT` env variable
 
 [junit]
-report_dir_pattern = "**/target/test-reports/*.xml"
+#report_dir_pattern = "**/target/test-reports/*.xml"
 #report_dir_pattern = "**/*.xml"
-#report_dir_pattern = "workarea/**/*.xml"
+report_dir_pattern = "workarea/**/*.xml"
