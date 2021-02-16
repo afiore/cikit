@@ -3,7 +3,7 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::{fs, io::BufReader, path::Path};
 
-#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize, Serialize)]
+#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize, Serialize, Clone)]
 #[serde(transparent)]
 pub struct GithubHandle(pub String);
 
@@ -31,7 +31,7 @@ impl GithubContext {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 #[serde(rename_all(serialize = "camelCase"))]
 pub struct GithubEvent {
     pub number: u32, //pr number
@@ -39,7 +39,7 @@ pub struct GithubEvent {
     pub sender: GithubUser,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 #[serde(rename_all(serialize = "camelCase"))]
 pub struct PullRequest {
     pub title: String,
@@ -47,7 +47,7 @@ pub struct PullRequest {
     pub commits_url: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 #[serde(rename_all(serialize = "camelCase"))]
 pub struct GithubUser {
     pub avatar_url: String,
@@ -68,4 +68,4 @@ mod tests {
     }
 }
 
-pub mod notifier;
+pub mod comments;

@@ -1,6 +1,6 @@
-use cikit::config::Config;
 use cikit::gcs;
 use cikit::junit;
+use cikit::{config::Config, github};
 use cikit::{
     console::{ConsoleJsonReport, ConsoleTextReport},
     github::GithubContext,
@@ -86,7 +86,7 @@ fn main() -> anyhow::Result<()> {
             };
 
             let github_run_id = github_ctx.as_ref().map(|c| c.run_id.clone());
-            let github_event = github_ctx.map(|c| c.event);
+            let github_event = github_ctx.as_ref().map(|c| c.event.clone());
 
             match format {
                 Format::Text { sort_by } => {
@@ -104,7 +104,7 @@ fn main() -> anyhow::Result<()> {
                     let report = HTMLReport::new(output_dir.clone(), force)?;
                     report.write(summary, test_suites, github_event)?;
 
-                    let _report_url = if let Some((config, github_run_id)) =
+                    let report_url = if let Some((config, github_run_id)) =
                         config.notifications.google_cloud_storage.zip(github_run_id)
                     {
                         let gcs_publisher =
@@ -114,6 +114,15 @@ fn main() -> anyhow::Result<()> {
                     } else {
                         None
                     };
+
+                    if let Some((config, github_ctx)) =
+                        config.notifications.github_comments.zip(github_ctx)
+                    {
+                        let mut comment_publisher = github::comments::CommentPublisher::new(config);
+
+                        // let outcome = junit::TestSuitesOutcome::new(summary, test_suites);
+                        // comment_publisher.publish(&outcome, &github_ctx, report_url)?;
+                    }
 
                     Ok(())
                 }

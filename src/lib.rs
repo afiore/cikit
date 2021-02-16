@@ -9,9 +9,8 @@ extern crate serde_xml_rs;
 
 pub mod config;
 pub mod console;
+pub mod gcs;
 pub mod github;
 pub mod html;
 pub mod junit;
-pub mod notify;
 pub mod slack;
-pub mod gcs;

@@ -261,6 +261,22 @@ pub enum TestSuitesOutcome {
     },
 }
 impl TestSuitesOutcome {
+    pub fn new(summary: Summary, suites: Vec<SuiteWithSummary>) -> Self {
+        if summary.is_successful() {
+            TestSuitesOutcome::Success(summary)
+        } else {
+            let failed_testsuites = suites
+                .into_iter()
+                .filter_map(|s| s.value.as_failed())
+                .map(|s| s.value)
+                .collect::<Vec<_>>();
+
+            TestSuitesOutcome::Failure {
+                summary,
+                failed_testsuites,
+            }
+        }
+    }
     pub fn summary(&self) -> &Summary {
         match self {
             TestSuitesOutcome::Success(summary) => summary,
@@ -271,24 +287,6 @@ impl TestSuitesOutcome {
         match self {
             TestSuitesOutcome::Success(_) => true,
             _ => false,
-        }
-    }
-
-    pub fn read(project_dir: Option<PathBuf>, config: &Config) -> anyhow::Result<Self> {
-        let (suites, summary) = read_testsuites(project_dir, config)?;
-
-        if summary.is_successful() {
-            Ok(TestSuitesOutcome::Success(summary))
-        } else {
-            let failed_testsuites = suites
-                .into_iter()
-                .filter_map(|ws| ws.value.as_failed())
-                .map(|ws| ws.value)
-                .collect();
-            Ok(TestSuitesOutcome::Failure {
-                summary,
-                failed_testsuites,
-            })
         }
     }
 }

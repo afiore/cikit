@@ -1,7 +1,6 @@
 use crate::config;
 use crate::github::GithubContext;
 use crate::junit::{self, FailedTestSuite, Summary, TestSuitesOutcome};
-use crate::notify::Notifier;
 use serde_derive::Deserialize;
 
 use std::{fmt::Display, io::Read};
@@ -112,12 +111,12 @@ impl SlackNotifier {
             client: reqwest::blocking::Client::new(),
         }
     }
-}
-
-impl Notifier for SlackNotifier {
-    type Event = TestSuitesOutcome;
-    type CIContext = GithubContext;
-    fn notify(&mut self, event: Self::Event, ctx: Self::CIContext) -> anyhow::Result<()> {
+    pub fn publish(
+        &mut self,
+        event: TestSuitesOutcome,
+        ctx: GithubContext,
+        _report_url: Option<String>,
+    ) -> anyhow::Result<()> {
         match &self.config {
             config::SlackNotifications {
                 user_handles,
@@ -127,7 +126,6 @@ impl Notifier for SlackNotifier {
                 if let Some(slack_handle) = user_handles.get(&ctx.actor) {
                     headline.push_str(&format!("<@{}> ", slack_handle))
                 }
-                //TODO: add link to github workflow run
                 headline.push_str(&format!(
                     "build for PR <{}|{}>",
                     ctx.event.pull_request.html_url, ctx.event.pull_request.title
