@@ -38,7 +38,7 @@ pub struct TestSuite {
 }
 
 impl TestSuite {
-    pub fn with_summary(self) -> SuiteWithSummary {
+    pub fn summary(&self) -> Summary {
         let mut tests = 0;
         let mut failures = 0;
         let mut errors = 0; //TODO: remove
@@ -60,26 +60,31 @@ impl TestSuite {
             }
         }
 
-        let summary = Summary {
-            time: self.time,
+        Summary {
+            time: self.time.clone(),
             tests,
             failures,
             errors,
             skipped,
-        };
+        }
+    }
+
+    //TODO: avoid
+    pub fn with_summary(self) -> SuiteWithSummary {
+        let summary = self.summary();
         SummaryWith {
             summary,
             value: self,
         }
     }
 
-    pub fn as_failed(self) -> Option<FailedSuiteWithSummary> {
-        let SummaryWith { summary, value } = self.with_summary();
+    pub fn as_failed(&self) -> Option<FailedSuiteWithSummary> {
+        let summary = self.summary();
         let mut failed_testcases: Vec<FailedTestCase> = Vec::new();
 
-        for t in value.testcases {
-            if !t.is_successful() {
-                failed_testcases.push(t.as_failed().unwrap());
+        for t in &self.testcases {
+            if let Some(t) = t.as_failed() {
+                failed_testcases.push(t);
             }
         }
 
@@ -87,9 +92,9 @@ impl TestSuite {
             None
         } else {
             let value = FailedTestSuite {
-                name: value.name,
-                time: value.time,
-                timestamp: value.timestamp,
+                name: self.name.clone(),
+                time: self.time.clone(),
+                timestamp: self.timestamp.clone(),
                 failed_testcases: failed_testcases,
             };
             Some(SummaryWith { summary, value })
@@ -124,35 +129,24 @@ impl TestCase {
         self.failure.is_none() && self.error.is_none()
     }
 
-    fn as_failed(self) -> Option<FailedTestCase> {
+    fn as_failed(&self) -> Option<FailedTestCase> {
         match self {
             TestCase {
                 name,
                 classname,
                 time,
-                failure: Some(failure),
-                error: _,
-                skipped: _,
-            } => Some(FailedTestCase {
-                name,
-                classname,
-                time,
                 failure,
-            }),
-            TestCase {
-                name,
-                classname,
-                time,
-                failure: None,
-                error: Some(failure),
+                error,
                 skipped: _,
-            } => Some(FailedTestCase {
-                name,
-                classname,
-                time,
-                failure,
-            }),
-            _ => None,
+            } => failure
+                .as_ref()
+                .or_else(|| error.as_ref())
+                .map(|failure| FailedTestCase {
+                    name: name.clone(),
+                    classname: classname.clone(),
+                    time: time.clone(),
+                    failure: failure.clone(),
+                }),
         }
     }
 

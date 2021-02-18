@@ -1,7 +1,7 @@
 use crate::junit::{FullReport, TestOutcome};
 use colored::{Color, ColoredString, Colorize};
 use io::Result;
-use std::{borrow::Borrow, io, ops::Deref};
+use std::io;
 
 use crate::{github::GithubEvent, junit::*};
 
