@@ -135,15 +135,11 @@ impl ConsoleTextReport {
 }
 
 impl ConsoleTextReport {
-    pub fn render(
-        &mut self,
-        test_suites: Vec<SuiteWithSummary>,
-        github_event: Option<GithubEvent>,
-    ) -> anyhow::Result<()> {
-        if let Some(github_event) = github_event {
+    pub fn render(&mut self, full_report: &FullReport) -> anyhow::Result<()> {
+        if let Some(github_event) = full_report.github_event.as_ref() {
             github_event.display(&mut self.sink, 0)?;
         }
-        for suite in &test_suites {
+        for suite in &full_report.all_suites {
             suite.display(&mut self.sink, 0)?;
         }
         Ok(())
@@ -164,30 +160,7 @@ impl ConsoleJsonReport {
 }
 
 impl ConsoleJsonReport {
-    pub fn render(
-        &mut self,
-        summary: Summary,
-        all_suites: Vec<SuiteWithSummary>,
-        github_event: Option<GithubEvent>,
-    ) -> anyhow::Result<()> {
-        let failed: Vec<FailedSuiteWithSummary> = all_suites
-            .iter()
-            .filter_map(|suite| {
-                if !suite.is_successful() {
-                    suite.value.clone().as_failed()
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let full_report = FullReport {
-            summary,
-            all_suites,
-            failed,
-            github_event,
-        };
-
+    pub fn render(&mut self, full_report: &FullReport) -> anyhow::Result<()> {
         if self.compact {
             serde_json::ser::to_writer(&mut self.sink, &full_report)?;
         } else {

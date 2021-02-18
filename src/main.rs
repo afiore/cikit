@@ -1,13 +1,10 @@
-use cikit::gcs;
 use cikit::junit;
 use cikit::{config::Config, github};
-use cikit::{
-    console::{ConsoleJsonReport, ConsoleTextReport},
-    github::GithubContext,
-};
+use cikit::{console::ConsoleJsonReport, github::GithubContext};
+use cikit::{console::ConsoleTextReport, gcs};
 
 use cikit::html::HTMLReport;
-use junit::{ReportSorting, SortingOrder};
+use junit::{FullReport, ReportSorting, SortingOrder};
 
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -78,7 +75,7 @@ fn main() -> anyhow::Result<()> {
             format,
             github_event_file,
         } => {
-            let (mut test_suites, summary) = junit::read_testsuites(opt.project_dir, &config)?;
+            let (test_suites, summary) = junit::read_testsuites(opt.project_dir, &config)?;
             let github_ctx = if let Some(github_event_file) = github_event_file {
                 GithubContext::from_file(github_event_file).ok()
             } else {
@@ -87,22 +84,21 @@ fn main() -> anyhow::Result<()> {
 
             let github_run_id = github_ctx.as_ref().map(|c| c.run_id.clone());
             let github_event = github_ctx.as_ref().map(|c| c.event.clone());
+            let mut full_report = FullReport::new(test_suites, summary, github_event);
 
             match format {
                 Format::Text { sort_by } => {
                     if let Some(sorting) = sort_by {
-                        junit::sort_testsuites(&mut test_suites, sorting);
+                        full_report.sort_suites(&sorting);
                     }
-                    ConsoleTextReport::stdout().render(test_suites, github_event)
+                    ConsoleTextReport::stdout().render(&full_report)
                 }
-                Format::Json { compact } => {
-                    ConsoleJsonReport::stdout(compact).render(summary, test_suites, github_event)
-                }
+                Format::Json { compact } => ConsoleJsonReport::stdout(compact).render(&full_report),
                 Format::Html { output_dir, force } => {
                     //FIXME: avoid PathBuf, use AsRef!
                     let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("report"));
                     let report = HTMLReport::new(output_dir.clone(), force)?;
-                    report.write(summary, test_suites, github_event)?;
+                    report.write(&full_report)?;
 
                     let report_url = if let Some((config, github_run_id)) =
                         config.notifications.google_cloud_storage.zip(github_run_id)
@@ -110,7 +106,7 @@ fn main() -> anyhow::Result<()> {
                         let gcs_publisher =
                             gcs::publisher::GCSPublisher::new(config, output_dir, github_run_id)?;
 
-                        Some(gcs_publisher.publish()?)
+                        gcs_publisher.publish().ok()
                     } else {
                         None
                     };
@@ -120,8 +116,11 @@ fn main() -> anyhow::Result<()> {
                     {
                         let mut comment_publisher = github::comments::CommentPublisher::new(config);
 
-                        // let outcome = junit::TestSuitesOutcome::new(summary, test_suites);
-                        // comment_publisher.publish(&outcome, &github_ctx, report_url)?;
+                        comment_publisher.publish(
+                            &full_report,
+                            &github_ctx,
+                            report_url.as_ref(),
+                        )?;
                     }
 
                     Ok(())

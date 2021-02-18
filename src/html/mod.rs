@@ -1,11 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{
-    console::ConsoleJsonReport,
-    github::GithubEvent,
-    junit::{SuiteWithSummary, Summary},
-};
+use crate::{console::ConsoleJsonReport, junit::FullReport};
 use fs::File;
 use log::debug;
 
@@ -33,12 +29,7 @@ impl HTMLReport {
         })
     }
 
-    pub fn write(
-        &self,
-        summary: Summary,
-        suites: Vec<SuiteWithSummary>,
-        github_event: Option<GithubEvent>,
-    ) -> anyhow::Result<()> {
+    pub fn write(&self, full_report: &FullReport) -> anyhow::Result<()> {
         fs::create_dir_all(&self.path)?;
         for (file_path, file_content) in UI_BUILD_ASSETS {
             let file_path = &self.path.join(file_path);
@@ -50,7 +41,7 @@ impl HTMLReport {
         let json_data_path = &self.path.join("data.json");
         let json_data = File::create(json_data_path)?;
         let mut json_report = ConsoleJsonReport::sink_to(true, Box::new(json_data));
-        json_report.render(summary, suites, github_event)?;
+        json_report.render(full_report)?;
         Ok(())
     }
 }

@@ -69,7 +69,6 @@ impl TestSuite {
         }
     }
 
-    //TODO: avoid
     pub fn with_summary(self) -> SuiteWithSummary {
         let summary = self.summary();
         SummaryWith {
@@ -236,10 +235,10 @@ pub fn read_testsuites(
     Ok((test_suites, summary))
 }
 
-pub fn sort_testsuites(suites: &mut Vec<SuiteWithSummary>, sorting: ReportSorting) {
+pub fn sort_testsuites(suites: &mut Vec<SuiteWithSummary>, sorting: &ReportSorting) {
     let ReportSorting::Time(order) = sorting;
     suites.sort_by(|a, b| {
-        if order == SortingOrder::Asc {
+        if *order == SortingOrder::Asc {
             a.summary.time.cmp(&b.summary.time)
         } else {
             b.summary.time.cmp(&a.summary.time)
@@ -247,43 +246,43 @@ pub fn sort_testsuites(suites: &mut Vec<SuiteWithSummary>, sorting: ReportSortin
     });
 }
 
-pub enum TestSuitesOutcome {
-    Success(Summary),
-    Failure {
-        summary: Summary,
-        failed_testsuites: Vec<FailedTestSuite>,
-    },
-}
-impl TestSuitesOutcome {
-    pub fn new(summary: Summary, suites: Vec<SuiteWithSummary>) -> Self {
-        if summary.is_successful() {
-            TestSuitesOutcome::Success(summary)
-        } else {
-            let failed_testsuites = suites
-                .into_iter()
-                .filter_map(|s| s.value.as_failed())
-                .map(|s| s.value)
-                .collect::<Vec<_>>();
+// pub enum TestSuitesOutcome {
+//     Success(Summary),
+//     Failure {
+//         summary: Summary,
+//         failed_testsuites: Vec<FailedTestSuite>,
+//     },
+// }
+// impl TestSuitesOutcome {
+//     pub fn new(summary: Summary, suites: Vec<SuiteWithSummary>) -> Self {
+//         if summary.is_successful() {
+//             TestSuitesOutcome::Success(summary)
+//         } else {
+//             let failed_testsuites = suites
+//                 .into_iter()
+//                 .filter_map(|s| s.value.as_failed())
+//                 .map(|s| s.value)
+//                 .collect::<Vec<_>>();
 
-            TestSuitesOutcome::Failure {
-                summary,
-                failed_testsuites,
-            }
-        }
-    }
-    pub fn summary(&self) -> &Summary {
-        match self {
-            TestSuitesOutcome::Success(summary) => summary,
-            TestSuitesOutcome::Failure { summary, .. } => summary,
-        }
-    }
-    pub fn is_successful(&self) -> bool {
-        match self {
-            TestSuitesOutcome::Success(_) => true,
-            _ => false,
-        }
-    }
-}
+//             TestSuitesOutcome::Failure {
+//                 summary,
+//                 failed_testsuites,
+//             }
+//         }
+//     }
+//     pub fn summary(&self) -> &Summary {
+//         match self {
+//             TestSuitesOutcome::Success(summary) => summary,
+//             TestSuitesOutcome::Failure { summary, .. } => summary,
+//         }
+//     }
+//     pub fn is_successful(&self) -> bool {
+//         match self {
+//             TestSuitesOutcome::Success(_) => true,
+//             _ => false,
+//         }
+//     }
+// }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -292,6 +291,34 @@ pub struct FullReport {
     pub failed: Vec<FailedSuiteWithSummary>,
     pub summary: Summary,
     pub github_event: Option<GithubEvent>,
+}
+
+impl FullReport {
+    pub fn new(
+        all_suites: Vec<SuiteWithSummary>,
+        summary: Summary,
+        github_event: Option<GithubEvent>,
+    ) -> FullReport {
+        let failed: Vec<SummaryWith<FailedTestSuite>> = all_suites
+            .iter()
+            .filter_map(|s| s.value.as_failed())
+            .collect();
+
+        FullReport {
+            all_suites,
+            failed,
+            summary,
+            github_event,
+        }
+    }
+
+    pub fn sort_suites(&mut self, sorting: &ReportSorting) {
+        sort_testsuites(&mut self.all_suites, sorting);
+    }
+
+    pub fn is_successful(&self) -> bool {
+        self.failed.len() == 0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]

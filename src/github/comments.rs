@@ -1,6 +1,5 @@
 use super::GithubContext;
-use crate::junit::TestSuitesOutcome;
-use crate::{config::GithubNotifications, gcs::ReportUrl};
+use crate::{config::GithubNotifications, gcs::ReportUrl, junit::FullReport};
 use log::warn;
 use std::io::Read;
 
@@ -18,19 +17,18 @@ impl CommentPublisher {
     }
     pub fn publish(
         &mut self,
-        outcome: &TestSuitesOutcome,
+        full_report: &FullReport,
         ctx: &GithubContext,
-        report_url: Option<ReportUrl>,
+        report_url: Option<&ReportUrl>,
     ) -> anyhow::Result<()> {
         let mut response_body = String::new();
-        let mut comment = match outcome {
-            TestSuitesOutcome::Success(_) => ":heavy_check_mark: Test suite passed!".to_owned(),
-            TestSuitesOutcome::Failure {
-                failed_testsuites, ..
-            } => format!(
+        let mut comment = if full_report.is_successful() {
+            ":heavy_check_mark: Test suite passed!".to_owned()
+        } else {
+            format!(
                 ":x: Test suite failed with _{}_ errors",
-                failed_testsuites.len()
-            ),
+                full_report.failed.len()
+            )
         };
         if let Some(report_url) = report_url {
             comment.push_str(&format!(":bookmark_tabs: [Test report]({})", report_url.0));
