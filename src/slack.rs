@@ -1,6 +1,6 @@
-use crate::github::GithubContext;
 use crate::junit::{self, FailedTestSuite, Summary};
 use crate::{config, junit::FullReport};
+use crate::{gcs::ReportUrl, github::GithubContext};
 use serde_derive::Deserialize;
 
 use std::{fmt::Display, io::Read};
@@ -115,7 +115,7 @@ impl SlackNotifier {
         &mut self,
         full_report: &FullReport,
         ctx: &GithubContext,
-        _report_url: Option<&String>,
+        _report_url: Option<&ReportUrl>,
     ) -> anyhow::Result<()> {
         match &self.config {
             config::SlackNotifications {

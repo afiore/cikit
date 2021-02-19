@@ -1,7 +1,7 @@
-use cikit::junit;
 use cikit::{config::Config, github};
 use cikit::{console::ConsoleJsonReport, github::GithubContext};
 use cikit::{console::ConsoleTextReport, gcs};
+use cikit::{junit, slack::SlackNotifier};
 
 use cikit::html::HTMLReport;
 use junit::{FullReport, ReportSorting, SortingOrder};
@@ -54,7 +54,10 @@ enum Cmd {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "cikit", about = "The continuous integration reporting toolkit")]
+#[structopt(
+    name = "cikit",
+    about = "A reporting toolkit for continuous integration"
+)]
 struct Opt {
     /// Input file
     #[structopt(short, long, parse(from_os_str))]
@@ -111,8 +114,10 @@ fn main() -> anyhow::Result<()> {
                         None
                     };
 
-                    if let Some((config, github_ctx)) =
-                        config.notifications.github_comments.zip(github_ctx)
+                    if let Some((config, github_ctx)) = config
+                        .notifications
+                        .github_comments
+                        .zip(github_ctx.as_ref())
                     {
                         let mut comment_publisher = github::comments::CommentPublisher::new(config);
 
@@ -121,6 +126,12 @@ fn main() -> anyhow::Result<()> {
                             &github_ctx,
                             report_url.as_ref(),
                         )?;
+                    }
+
+                    if let Some((config, github_ctx)) = config.notifications.slack.zip(github_ctx) {
+                        let mut slack_notifier = SlackNotifier::new(config);
+
+                        slack_notifier.publish(&full_report, &github_ctx, report_url.as_ref())?;
                     }
 
                     Ok(())
