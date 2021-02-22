@@ -6,7 +6,6 @@ jobs:
     if: github.event.pull_request.merged == false
     runs-on: ubuntu-latest
     steps:
-      - run: "cat $GITHUB_EVENT_PATH"
       - uses: actions/checkout@v1
       - name: GCP setup
         uses: google-github-actions/setup-gcloud@master
@@ -21,4 +20,7 @@ jobs:
           toolchain: stable
       - run: cargo install cargo2junit
       - run: "mkdir junit-report && cargo test -- -Z unstable-options --format json | cargo2junit > junit-report/testreport.xml"
-      - run: "RUST_BACKTRACE=1 RUST_LOG='cikit=debug' cargo run -- --config-path ci.config.toml . test-report $GITHUB_EVENT_PATH html"
+      - env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}"
+        run: echo "$GITHUB_CONTEXT" > github-context.json
+      - run: "RUST_BACKTRACE=1 RUST_LOG='cikit=debug' cargo run -- --config-path ci.config.toml . test-report github-context.json html"
