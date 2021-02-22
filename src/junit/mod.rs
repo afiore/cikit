@@ -1,6 +1,6 @@
 use crate::{config::Config, github::GithubEvent};
 use anyhow::Result;
-use chrono::{Duration, NaiveDateTime};
+use chrono::Duration;
 use fs::TestSuiteVisitor;
 use serde::{Deserialize, Serialize};
 use serdes::*;
@@ -32,7 +32,6 @@ pub struct TestSuite {
     #[serde(deserialize_with = "f32_to_duration")]
     #[serde(skip_serializing)]
     pub time: Duration,
-    pub timestamp: NaiveDateTime,
     #[serde(rename = "testcase", default)]
     pub testcases: Vec<TestCase>,
 }
@@ -93,7 +92,6 @@ impl TestSuite {
             let value = FailedTestSuite {
                 name: self.name.clone(),
                 time: self.time.clone(),
-                timestamp: self.timestamp.clone(),
                 failed_testcases: failed_testcases,
             };
             Some(SummaryWith { summary, value })
@@ -337,7 +335,6 @@ pub struct FailedTestSuite {
     pub name: String,
     #[serde(skip_serializing)]
     pub time: Duration,
-    pub timestamp: NaiveDateTime,
     pub failed_testcases: Vec<FailedTestCase>,
 }
 
@@ -370,7 +367,7 @@ mod tests {
     extern crate uuid;
 
     use super::*;
-    use chrono::NaiveDate;
+
     use pretty_assertions::assert_eq;
     use serde_xml_rs::from_reader;
     use std::{env, path::Path};
@@ -433,7 +430,6 @@ com.example
         let expected = TestSuite {
             name: "com.example.LiveTopicCounterTest".to_owned(),
             time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
-            timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
             testcases: vec![
                 TestCase {
                 name:
@@ -473,7 +469,6 @@ com.example
         let suite = TestSuite {
             name: "com.example.LiveTopicCounterTest".to_owned(),
             time: Duration::milliseconds(250),
-            timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
             testcases: vec![
                 TestCase {
                 name:
@@ -508,7 +503,6 @@ com.example
           "failures":1,
           "skipped":1,
           "time":250,
-          "timestamp":"2020-06-07T14:18:12",
           "name":"com.example.LiveTopicCounterTest",
           "testcase":[{
             "classname":"com.example.LiveTopicCounterTest",
@@ -557,7 +551,6 @@ com.example
             value: FailedTestSuite {
                 name: "com.example.LiveTopicCounterTest".to_owned(),
                 time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
-                timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 13),
                 failed_testcases: vec![failed],
             },
         };

@@ -10,8 +10,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - uses: actions-rs/cargo@v1.0.3
-        env:
-          CI: "false"
-        with:
-          command: test
+      - run: cargo install cargo2junit
+      - run: "cargo test -- -Z unstable-options --format json > target/testreport.xml"
+      - run: "cat target/testreport.xml"
