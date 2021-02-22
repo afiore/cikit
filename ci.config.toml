@@ -1,0 +1,8 @@
+[notifications]
+
+[notifications.google_cloud_storage]
+bucket = "cikit"
+#creds will be read from `SERVICE_ACCOUNT` env variable
+
+[junit]
+report_dir_pattern = "junit-report/*.xml"
