@@ -12,4 +12,4 @@ jobs:
           toolchain: stable
       - run: cargo install cargo2junit
       - run: "mkdir junit-report && cargo test -- -Z unstable-options --format json > junit-report/testreport.xml"
-      - run: "cat target/testreport.xml"
+      - run: "cat junit-report/testreport.xml"
