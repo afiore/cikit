@@ -19,5 +19,5 @@ jobs:
         with:
           toolchain: stable
       - run: cargo install cargo2junit
-      - run: "mkdir junit-report && cargo test -- -Z unstable-options --format json > junit-report/testreport.xml"
+      - run: "mkdir junit-report && cargo test -- -Z unstable-options --format json | cargo2junit > junit-report/testreport.xml"
       - run: "RUST_BACKTRACE=1 RUST_LOG='cikit=debug' cargo run -- --config-path ci.config.toml . test-report src/github/testdata/gh.pr-context.json html"
