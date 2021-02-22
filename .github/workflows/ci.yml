@@ -6,6 +6,7 @@ jobs:
     if: github.event.pull_request.merged == false
     runs-on: ubuntu-latest
     steps:
+      - run: "cat $GITHUB_EVENT_PATH"
       - uses: actions/checkout@v1
       - name: GCP setup
         uses: google-github-actions/setup-gcloud@master
