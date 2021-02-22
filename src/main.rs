@@ -80,7 +80,7 @@ fn main() -> anyhow::Result<()> {
         } => {
             let (test_suites, summary) = junit::read_testsuites(opt.project_dir, &config)?;
             let github_ctx = if let Some(github_event_file) = github_event_file {
-                GithubContext::from_file(github_event_file).ok()
+                Some(GithubContext::from_file(github_event_file)?)
             } else {
                 None
             };
