@@ -1,6 +1,6 @@
 use super::GithubContext;
 use crate::{config::GithubNotifications, gcs::ReportUrl, junit::FullReport};
-use log::warn;
+use log::{info, warn};
 use std::io::Read;
 
 pub struct CommentPublisher {
@@ -38,6 +38,9 @@ impl CommentPublisher {
             "https://api.github.com/repos/{}/commits/{}/comments",
             ctx.repository.0, ctx.sha
         );
+
+        info!("Publishing PR commit using API endpoint: {}", &endpoint_url);
+
         let payload = serde_json::json!({ "body": comment });
         let mut resp = self
             .client
