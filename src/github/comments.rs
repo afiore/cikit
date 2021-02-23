@@ -34,7 +34,10 @@ impl CommentPublisher {
             comment.push_str(&format!(":bookmark_tabs: [Test report]({})", report_url.0));
         }
 
-        let endpoint_url = format!("/repos/{}/commits/{}/comments", ctx.repository.0, ctx.sha);
+        let endpoint_url = format!(
+            "https://api.github.com/repos/{}/commits/{}/comments",
+            ctx.repository.0, ctx.sha
+        );
         let payload = serde_json::json!({ "body": comment });
         let mut resp = self
             .client
