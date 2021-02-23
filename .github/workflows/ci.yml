@@ -26,4 +26,5 @@ jobs:
       - env:
           RUST_BACKTRACE: "1"
           RUST_LOG: "cikit=debug"
+          GITHUB_CONTEXT: ${{ secrets.GITHUB_TOKEN }}
         run: "cargo run -- --config-path ci.config.toml . test-report github-context.json html"
