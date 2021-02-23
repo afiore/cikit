@@ -11,6 +11,8 @@ user_2 = "usertwo"
 bucket = "cikit"
 #creds will be read from `SERVICE_ACCOUNT` env variable
 
+[notifications.github]
+
 [junit]
 #report_dir_pattern = "**/target/test-reports/*.xml"
 #report_dir_pattern = "**/*.xml"

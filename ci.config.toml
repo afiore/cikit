@@ -4,5 +4,7 @@
 bucket = "cikit"
 #creds will be read from `SERVICE_ACCOUNT` env variable
 
+[notifications.github]
+
 [junit]
 report_dir_pattern = "junit-report/*.xml"
