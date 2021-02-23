@@ -35,18 +35,21 @@ impl CommentPublisher {
         }
 
         let endpoint_url = format!(
-            "https://api.github.com/repos/{}/commits/{}/comments",
-            ctx.repository.0, ctx.sha
+            "https://api.github.com/repos/{}/pulls/{}/comments",
+            ctx.repository.0, ctx.event.number
         );
 
-        info!("Publishing PR commit using API endpoint: {}", &endpoint_url);
+        info!(
+            "Publishing PR comment using API endpoint: {}",
+            &endpoint_url
+        );
 
         let payload = serde_json::json!({ "body": comment });
         let mut resp = self
             .client
             .post(&endpoint_url)
             .json(&payload)
-            .header("GITHUB_TOKEN", &self.config.token)
+            .header("Authorization", format!("Bearer {}", &self.config.token))
             .header("User-Agent", "Cikit")
             .header("Accept", "application/vnd.github.v3+json")
             .send()?;
