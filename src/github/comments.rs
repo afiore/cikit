@@ -44,6 +44,7 @@ impl CommentPublisher {
             .post(&endpoint_url)
             .json(&payload)
             .header("GITHUB_TOKEN", &self.config.token)
+            .header("User-Agent", "Cikit")
             .send()?;
 
         if !resp.status().is_success() {
