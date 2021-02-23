@@ -48,6 +48,7 @@ impl CommentPublisher {
             .json(&payload)
             .header("GITHUB_TOKEN", &self.config.token)
             .header("User-Agent", "Cikit")
+            .header("Accept", "application/vnd.github.v3+json")
             .send()?;
 
         if !resp.status().is_success() {
