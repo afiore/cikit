@@ -3,9 +3,14 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::{fs, io::BufReader, path::Path};
 
-#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize, Serialize)]
+#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize, Serialize, Clone)]
 #[serde(transparent)]
 pub struct GithubHandle(pub String);
+
+#[derive(PartialEq, Hash, Eq, PartialOrd, Ord, Debug, Deserialize, Serialize)]
+#[serde(transparent)]
+/// The github owner and repository (slash separated)
+pub struct OwnerRepo(pub String);
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct GithubContext {
@@ -14,6 +19,7 @@ pub struct GithubContext {
     pub run_id: String,
     pub actor: GithubHandle,
     pub event: GithubEvent,
+    pub repository: OwnerRepo,
 }
 
 impl GithubContext {
@@ -25,7 +31,7 @@ impl GithubContext {
     }
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 #[serde(rename_all(serialize = "camelCase"))]
 pub struct GithubEvent {
     pub number: u32, //pr number
@@ -33,7 +39,7 @@ pub struct GithubEvent {
     pub sender: GithubUser,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 #[serde(rename_all(serialize = "camelCase"))]
 pub struct PullRequest {
     pub title: String,
@@ -41,7 +47,7 @@ pub struct PullRequest {
     pub commits_url: String,
 }
 
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
 #[serde(rename_all(serialize = "camelCase"))]
 pub struct GithubUser {
     pub avatar_url: String,
@@ -62,4 +68,4 @@ mod tests {
     }
 }
 
-pub mod notifier;
+pub mod comments;

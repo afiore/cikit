@@ -1,7 +1,6 @@
-use crate::config;
-use crate::github::GithubContext;
-use crate::junit::{self, FailedTestSuite, Summary, TestSuitesOutcome};
-use crate::notify::Notifier;
+use crate::junit::{self, FailedTestSuite, Summary};
+use crate::{config, junit::FullReport};
+use crate::{gcs::ReportUrl, github::GithubContext};
 use serde_derive::Deserialize;
 
 use std::{fmt::Display, io::Read};
@@ -112,12 +111,12 @@ impl SlackNotifier {
             client: reqwest::blocking::Client::new(),
         }
     }
-}
-
-impl Notifier for SlackNotifier {
-    type Event = TestSuitesOutcome;
-    type CIContext = GithubContext;
-    fn notify(&mut self, event: Self::Event, ctx: Self::CIContext) -> anyhow::Result<()> {
+    pub fn publish(
+        &mut self,
+        full_report: &FullReport,
+        ctx: &GithubContext,
+        _report_url: Option<&ReportUrl>,
+    ) -> anyhow::Result<()> {
         match &self.config {
             config::SlackNotifications {
                 user_handles,
@@ -127,45 +126,42 @@ impl Notifier for SlackNotifier {
                 if let Some(slack_handle) = user_handles.get(&ctx.actor) {
                     headline.push_str(&format!("<@{}> ", slack_handle))
                 }
-                //TODO: add link to github workflow run
                 headline.push_str(&format!(
                     "build for PR <{}|{}>",
                     ctx.event.pull_request.html_url, ctx.event.pull_request.title
                 ));
 
-                if event.is_successful() {
+                if full_report.is_successful() {
                     headline.push_str(" :heavy_tick:");
                 } else {
                     headline.push_str(" :heavy_exclamation_mark:");
                 }
-                let summary_block = Block::headline_with_summary(&headline, event.summary());
+                let summary_block = Block::headline_with_summary(&headline, &full_report.summary);
 
-                let message: Blocks = match event {
-                    TestSuitesOutcome::Failure {
-                        failed_testsuites, ..
-                    } => {
-                        let failed_suites_blocks: Vec<Block> = failed_testsuites
-                            .iter()
-                            .map(|suite| Block::failed_testsuite(&suite))
-                            .collect();
-
-                        let mut blocks = vec![
-                            summary_block,
-                            Block::Divider,
-                            Block::Section {
-                                text: Text::mrkdwn("Failed test suites:"),
-                                fields: vec![],
-                            },
-                            Block::Divider,
-                        ];
-
-                        blocks.extend(failed_suites_blocks);
-
-                        Blocks { blocks }
-                    }
-                    TestSuitesOutcome::Success(_) => Blocks {
+                let message: Blocks = if full_report.is_successful() {
+                    Blocks {
                         blocks: vec![summary_block, Block::Divider],
-                    },
+                    }
+                } else {
+                    let failed_suites_blocks: Vec<Block> = full_report
+                        .failed
+                        .iter()
+                        .map(|suite| Block::failed_testsuite(&suite.value))
+                        .collect();
+
+                    let mut blocks = vec![
+                        summary_block,
+                        Block::Divider,
+                        Block::Section {
+                            text: Text::mrkdwn("Failed test suites:"),
+                            fields: vec![],
+                        },
+                        Block::Divider,
+                    ];
+
+                    blocks.extend(failed_suites_blocks);
+
+                    Blocks { blocks }
                 };
 
                 let mut response_body = String::new();

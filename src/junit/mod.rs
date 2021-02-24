@@ -1,6 +1,6 @@
 use crate::{config::Config, github::GithubEvent};
 use anyhow::Result;
-use chrono::{Duration, NaiveDateTime};
+use chrono::Duration;
 use fs::TestSuiteVisitor;
 use serde::{Deserialize, Serialize};
 use serdes::*;
@@ -32,13 +32,12 @@ pub struct TestSuite {
     #[serde(deserialize_with = "f32_to_duration")]
     #[serde(skip_serializing)]
     pub time: Duration,
-    pub timestamp: NaiveDateTime,
     #[serde(rename = "testcase", default)]
     pub testcases: Vec<TestCase>,
 }
 
 impl TestSuite {
-    pub fn with_summary(self) -> SuiteWithSummary {
+    pub fn summary(&self) -> Summary {
         let mut tests = 0;
         let mut failures = 0;
         let mut errors = 0; //TODO: remove
@@ -60,26 +59,30 @@ impl TestSuite {
             }
         }
 
-        let summary = Summary {
-            time: self.time,
+        Summary {
+            time: self.time.clone(),
             tests,
             failures,
             errors,
             skipped,
-        };
+        }
+    }
+
+    pub fn with_summary(self) -> SuiteWithSummary {
+        let summary = self.summary();
         SummaryWith {
             summary,
             value: self,
         }
     }
 
-    pub fn as_failed(self) -> Option<FailedSuiteWithSummary> {
-        let SummaryWith { summary, value } = self.with_summary();
+    pub fn as_failed(&self) -> Option<FailedSuiteWithSummary> {
+        let summary = self.summary();
         let mut failed_testcases: Vec<FailedTestCase> = Vec::new();
 
-        for t in value.testcases {
-            if !t.is_successful() {
-                failed_testcases.push(t.as_failed().unwrap());
+        for t in &self.testcases {
+            if let Some(t) = t.as_failed() {
+                failed_testcases.push(t);
             }
         }
 
@@ -87,9 +90,8 @@ impl TestSuite {
             None
         } else {
             let value = FailedTestSuite {
-                name: value.name,
-                time: value.time,
-                timestamp: value.timestamp,
+                name: self.name.clone(),
+                time: self.time.clone(),
                 failed_testcases: failed_testcases,
             };
             Some(SummaryWith { summary, value })
@@ -124,35 +126,24 @@ impl TestCase {
         self.failure.is_none() && self.error.is_none()
     }
 
-    fn as_failed(self) -> Option<FailedTestCase> {
+    fn as_failed(&self) -> Option<FailedTestCase> {
         match self {
             TestCase {
                 name,
                 classname,
                 time,
-                failure: Some(failure),
-                error: _,
-                skipped: _,
-            } => Some(FailedTestCase {
-                name,
-                classname,
-                time,
                 failure,
-            }),
-            TestCase {
-                name,
-                classname,
-                time,
-                failure: None,
-                error: Some(failure),
+                error,
                 skipped: _,
-            } => Some(FailedTestCase {
-                name,
-                classname,
-                time,
-                failure,
-            }),
-            _ => None,
+            } => failure
+                .as_ref()
+                .or_else(|| error.as_ref())
+                .map(|failure| FailedTestCase {
+                    name: name.clone(),
+                    classname: classname.clone(),
+                    time: time.clone(),
+                    failure: failure.clone(),
+                }),
         }
     }
 
@@ -242,10 +233,10 @@ pub fn read_testsuites(
     Ok((test_suites, summary))
 }
 
-pub fn sort_testsuites(suites: &mut Vec<SuiteWithSummary>, sorting: ReportSorting) {
+pub fn sort_testsuites(suites: &mut Vec<SuiteWithSummary>, sorting: &ReportSorting) {
     let ReportSorting::Time(order) = sorting;
     suites.sort_by(|a, b| {
-        if order == SortingOrder::Asc {
+        if *order == SortingOrder::Asc {
             a.summary.time.cmp(&b.summary.time)
         } else {
             b.summary.time.cmp(&a.summary.time)
@@ -253,45 +244,43 @@ pub fn sort_testsuites(suites: &mut Vec<SuiteWithSummary>, sorting: ReportSortin
     });
 }
 
-pub enum TestSuitesOutcome {
-    Success(Summary),
-    Failure {
-        summary: Summary,
-        failed_testsuites: Vec<FailedTestSuite>,
-    },
-}
-impl TestSuitesOutcome {
-    pub fn summary(&self) -> &Summary {
-        match self {
-            TestSuitesOutcome::Success(summary) => summary,
-            TestSuitesOutcome::Failure { summary, .. } => summary,
-        }
-    }
-    pub fn is_successful(&self) -> bool {
-        match self {
-            TestSuitesOutcome::Success(_) => true,
-            _ => false,
-        }
-    }
+// pub enum TestSuitesOutcome {
+//     Success(Summary),
+//     Failure {
+//         summary: Summary,
+//         failed_testsuites: Vec<FailedTestSuite>,
+//     },
+// }
+// impl TestSuitesOutcome {
+//     pub fn new(summary: Summary, suites: Vec<SuiteWithSummary>) -> Self {
+//         if summary.is_successful() {
+//             TestSuitesOutcome::Success(summary)
+//         } else {
+//             let failed_testsuites = suites
+//                 .into_iter()
+//                 .filter_map(|s| s.value.as_failed())
+//                 .map(|s| s.value)
+//                 .collect::<Vec<_>>();
 
-    pub fn read(project_dir: Option<PathBuf>, config: &Config) -> anyhow::Result<Self> {
-        let (suites, summary) = read_testsuites(project_dir, config)?;
-
-        if summary.is_successful() {
-            Ok(TestSuitesOutcome::Success(summary))
-        } else {
-            let failed_testsuites = suites
-                .into_iter()
-                .filter_map(|ws| ws.value.as_failed())
-                .map(|ws| ws.value)
-                .collect();
-            Ok(TestSuitesOutcome::Failure {
-                summary,
-                failed_testsuites,
-            })
-        }
-    }
-}
+//             TestSuitesOutcome::Failure {
+//                 summary,
+//                 failed_testsuites,
+//             }
+//         }
+//     }
+//     pub fn summary(&self) -> &Summary {
+//         match self {
+//             TestSuitesOutcome::Success(summary) => summary,
+//             TestSuitesOutcome::Failure { summary, .. } => summary,
+//         }
+//     }
+//     pub fn is_successful(&self) -> bool {
+//         match self {
+//             TestSuitesOutcome::Success(_) => true,
+//             _ => false,
+//         }
+//     }
+// }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -300,6 +289,34 @@ pub struct FullReport {
     pub failed: Vec<FailedSuiteWithSummary>,
     pub summary: Summary,
     pub github_event: Option<GithubEvent>,
+}
+
+impl FullReport {
+    pub fn new(
+        all_suites: Vec<SuiteWithSummary>,
+        summary: Summary,
+        github_event: Option<GithubEvent>,
+    ) -> FullReport {
+        let failed: Vec<SummaryWith<FailedTestSuite>> = all_suites
+            .iter()
+            .filter_map(|s| s.value.as_failed())
+            .collect();
+
+        FullReport {
+            all_suites,
+            failed,
+            summary,
+            github_event,
+        }
+    }
+
+    pub fn sort_suites(&mut self, sorting: &ReportSorting) {
+        sort_testsuites(&mut self.all_suites, sorting);
+    }
+
+    pub fn is_successful(&self) -> bool {
+        self.failed.len() == 0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -318,7 +335,6 @@ pub struct FailedTestSuite {
     pub name: String,
     #[serde(skip_serializing)]
     pub time: Duration,
-    pub timestamp: NaiveDateTime,
     pub failed_testcases: Vec<FailedTestCase>,
 }
 
@@ -351,7 +367,7 @@ mod tests {
     extern crate uuid;
 
     use super::*;
-    use chrono::NaiveDate;
+
     use pretty_assertions::assert_eq;
     use serde_xml_rs::from_reader;
     use std::{env, path::Path};
@@ -414,7 +430,6 @@ com.example
         let expected = TestSuite {
             name: "com.example.LiveTopicCounterTest".to_owned(),
             time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
-            timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
             testcases: vec![
                 TestCase {
                 name:
@@ -454,7 +469,6 @@ com.example
         let suite = TestSuite {
             name: "com.example.LiveTopicCounterTest".to_owned(),
             time: Duration::milliseconds(250),
-            timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 12),
             testcases: vec![
                 TestCase {
                 name:
@@ -489,7 +503,6 @@ com.example
           "failures":1,
           "skipped":1,
           "time":250,
-          "timestamp":"2020-06-07T14:18:12",
           "name":"com.example.LiveTopicCounterTest",
           "testcase":[{
             "classname":"com.example.LiveTopicCounterTest",
@@ -538,7 +551,6 @@ com.example
             value: FailedTestSuite {
                 name: "com.example.LiveTopicCounterTest".to_owned(),
                 time: Duration::nanoseconds(137000064) + Duration::seconds(2), //2.137,
-                timestamp: NaiveDate::from_ymd(2020, 6, 7).and_hms(14, 18, 13),
                 failed_testcases: vec![failed],
             },
         };
@@ -559,7 +571,7 @@ com.example
     }
     #[test]
     fn failed_testsuite() {
-        let report_dir_pattern = "**/testreports";
+        let report_dir_pattern = "**/testreports/*";
         let mut dir = env::temp_dir();
         let mut failed_suites: Vec<FailedTestSuite> = Vec::new();
 

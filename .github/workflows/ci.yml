@@ -7,11 +7,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
+      - name: GCP setup
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          version: "285.0.0"
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_email: ${{ secrets.GCP_SA_EMAIL }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - uses: actions-rs/cargo@v1.0.3
-        env:
-          CI: "false"
-        with:
-          command: test
+      - run: cargo install cargo2junit
+      - run: "mkdir junit-report && cargo test -- -Z unstable-options --format json | cargo2junit > junit-report/testreport.xml"
+      - env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT" > github-context.json
+      - env:
+          RUST_BACKTRACE: "1"
+          RUST_LOG: "cikit=debug"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: "cargo run -- --config-path ci.config.toml . test-report github-context.json html"

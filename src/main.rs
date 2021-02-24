@@ -1,15 +1,11 @@
-use cikit::config::Config;
-use cikit::junit;
-use cikit::{
-    console::{ConsoleJsonReport, ConsoleTextReport},
-    github::GithubContext,
-    notify::Notifier,
-    slack::SlackNotifier,
-};
+use cikit::{config::Config, github};
+use cikit::{console::ConsoleJsonReport, github::GithubContext};
+use cikit::{console::ConsoleTextReport, gcs};
+use cikit::{junit, slack::SlackNotifier};
 
 use cikit::html::HTMLReport;
-use junit::{ReportSorting, SortingOrder, TestSuitesOutcome};
-use log::warn;
+use junit::{FullReport, ReportSorting, SortingOrder};
+
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -49,8 +45,6 @@ impl Default for Format {
 
 #[derive(Debug, StructOpt)]
 enum Cmd {
-    ///Notifies the build outcome via Slack
-    Notify { github_event_file: PathBuf },
     ///Reads the JUnit test report and renders it in muliple formats
     TestReport {
         github_event_file: Option<PathBuf>,
@@ -60,7 +54,10 @@ enum Cmd {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "cikit", about = "The continuous integration reporting toolkit")]
+#[structopt(
+    name = "cikit",
+    about = "A reporting toolkit for continuous integration"
+)]
 struct Opt {
     /// Input file
     #[structopt(short, long, parse(from_os_str))]
@@ -77,43 +74,67 @@ fn main() -> anyhow::Result<()> {
     let cmd = opt.cmd;
     let config = Config::from_file(opt.config_path)?;
     match cmd {
-        Cmd::Notify { github_event_file } => {
-            let outcome = TestSuitesOutcome::read(opt.project_dir, &config)?;
-            let ctx = GithubContext::from_file(github_event_file)?;
-            if let Some(slack_config) = config.notifications.slack {
-                let mut notifier = SlackNotifier::new(slack_config);
-                notifier.notify(outcome, ctx)
-            } else {
-                Ok(warn!(
-                    "No configuration found for Slack notifications. Doing nothing"
-                ))
-            }
-        }
         Cmd::TestReport {
             format,
             github_event_file,
         } => {
-            let (mut test_suites, summary) = junit::read_testsuites(opt.project_dir, &config)?;
-            let github_event = if let Some(github_event_file) = github_event_file {
-                Some(GithubContext::from_file(github_event_file)?.event)
+            let (test_suites, summary) = junit::read_testsuites(opt.project_dir, &config)?;
+            let github_ctx = if let Some(github_event_file) = github_event_file {
+                Some(GithubContext::from_file(github_event_file)?)
             } else {
                 None
             };
 
+            let github_run_id = github_ctx.as_ref().map(|c| c.run_id.clone());
+            let github_event = github_ctx.as_ref().map(|c| c.event.clone());
+            let mut full_report = FullReport::new(test_suites, summary, github_event);
+
             match format {
                 Format::Text { sort_by } => {
                     if let Some(sorting) = sort_by {
-                        junit::sort_testsuites(&mut test_suites, sorting);
+                        full_report.sort_suites(&sorting);
                     }
-                    ConsoleTextReport::stdout().render(test_suites, github_event)
+                    ConsoleTextReport::stdout().render(&full_report)
                 }
-                Format::Json { compact } => {
-                    ConsoleJsonReport::stdout(compact).render(summary, test_suites, github_event)
-                }
+                Format::Json { compact } => ConsoleJsonReport::stdout(compact).render(&full_report),
                 Format::Html { output_dir, force } => {
+                    //FIXME: avoid PathBuf, use AsRef!
                     let output_dir = output_dir.unwrap_or_else(|| PathBuf::from("report"));
-                    let report = HTMLReport::new(output_dir, force)?;
-                    report.write(summary, test_suites, github_event)
+                    let report = HTMLReport::new(output_dir.clone(), force)?;
+                    report.write(&full_report)?;
+
+                    let report_url = if let Some((config, github_run_id)) =
+                        config.notifications.google_cloud_storage.zip(github_run_id)
+                    {
+                        let gcs_publisher =
+                            gcs::publisher::GCSPublisher::new(config, output_dir, github_run_id)?;
+
+                        gcs_publisher.publish().ok()
+                    } else {
+                        None
+                    };
+
+                    if let Some((config, github_ctx)) = config
+                        .notifications
+                        .github_comments
+                        .zip(github_ctx.as_ref())
+                    {
+                        let mut comment_publisher = github::comments::CommentPublisher::new(config);
+
+                        comment_publisher.publish(
+                            &full_report,
+                            &github_ctx,
+                            report_url.as_ref(),
+                        )?;
+                    }
+
+                    if let Some((config, github_ctx)) = config.notifications.slack.zip(github_ctx) {
+                        let mut slack_notifier = SlackNotifier::new(config);
+
+                        slack_notifier.publish(&full_report, &github_ctx, report_url.as_ref())?;
+                    }
+
+                    Ok(())
                 }
             }
         }

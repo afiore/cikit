@@ -7,5 +7,13 @@ webhook_url = "https://hooks.slack.com/services/T0C74DR5E/B0165V8JLRZ/g9H8yeaP9J
 user_1 = "userone"
 user_2 = "usertwo"
 
+[notifications.google_cloud_storage]
+bucket = "cikit"
+#creds will be read from `SERVICE_ACCOUNT` env variable
+
+[notifications.github_comments]
+
 [junit]
-report_dir_pattern = "**/target/test-reports"
+#report_dir_pattern = "**/target/test-reports/*.xml"
+#report_dir_pattern = "**/*.xml"
+report_dir_pattern = "workarea/**/*.xml"
