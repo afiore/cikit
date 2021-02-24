@@ -31,7 +31,10 @@ impl CommentPublisher {
             )
         };
         if let Some(report_url) = report_url {
-            comment.push_str(&format!(":bookmark_tabs: [Test report]({})", report_url.0));
+            comment.push_str(&format!(
+                "\n:bookmark_tabs: [Test report]({})",
+                report_url.0
+            ));
         }
 
         let endpoint_url = format!(
