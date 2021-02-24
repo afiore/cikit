@@ -44,7 +44,7 @@ impl CommentPublisher {
             &endpoint_url
         );
 
-        let payload = serde_json::json!({ "body": comment });
+        let payload = serde_json::json!({ "body": comment, "position": 0, "commit_id": &ctx.sha });
         let mut resp = self
             .client
             .post(&endpoint_url)
