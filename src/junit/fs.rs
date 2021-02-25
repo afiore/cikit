@@ -1,7 +1,7 @@
 use crate::console::ConsoleDisplay;
 use anyhow::Result;
 use glob::{glob_with, MatchOptions};
-use log::{debug, trace};
+use log::{debug, info};
 use std::{
     ffi::OsStr,
     fs, io,
@@ -43,7 +43,7 @@ impl ReportVisitor {
             }
         }
 
-        debug!("{} report files found", report_files.len());
+        info!("{} report files found", report_files.len());
 
         Ok(ReportVisitor {
             report_files,
@@ -98,7 +98,7 @@ impl<'s> TestSuiteReader<'s> {
             let suite_tx = suite_tx.clone();
             self.parser_pool.execute(move || {
                 let display_path = path.display();
-                trace!("parsing Junit suite: {}", display_path);
+                debug!("parsing Junit suite: {}", display_path);
                 let file = fs::File::open(display_path.to_string())
                     .expect(&format!("Couldn't open report file: {}", display_path));
                 let suites = super::read_suites(file).expect(&format!(
@@ -124,14 +124,13 @@ impl<'s> TestSuiteReader<'s> {
         }
     }
 
-    //TODO: consume self, or rewind state on completion
-    pub fn all_suites(&mut self) -> Vec<SummaryWith<TestSuite>> {
+    pub fn all_suites(mut self) -> Vec<SummaryWith<TestSuite>> {
         let mut suites: Vec<SummaryWith<TestSuite>> = Vec::new();
         let (suite_tx, suite_rx) = channel::<Vec<SummaryWith<TestSuite>>>();
         self.par_parse_suites(suite_tx);
         loop {
             if let Ok(mut parsed_suites) = suite_rx.recv() {
-                trace!(
+                debug!(
                     "Appending {} new suites. Total: {}",
                     parsed_suites.len(),
                     suites.len()
