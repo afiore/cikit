@@ -1,10 +1,11 @@
 use crate::{config::Config, github::GithubEvent};
 use anyhow::Result;
 use chrono::Duration;
-use fs::TestSuiteVisitor;
 use serde::{Deserialize, Serialize};
 use serdes::*;
 use std::{env, io, ops::AddAssign, path::PathBuf};
+
+use self::fs::TestSuiteReader;
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct SummaryWith<T>
@@ -223,13 +224,16 @@ pub fn read_testsuites(
 ) -> anyhow::Result<(Vec<SuiteWithSummary>, Summary)> {
     let current_dir = env::current_dir()?;
     let project_dir = project_dir.unwrap_or_else(|| current_dir);
+    let display_progress = atty::is(atty::Stream::Stdout);
     let mut summary = Summary::zero();
-    let visitor = TestSuiteVisitor::from_basedir(
+
+    let testsuite_reader = TestSuiteReader::from_basedir(
         project_dir,
         &config.junit.report_dir_pattern,
         &mut summary,
+        display_progress,
     )?;
-    let test_suites: Vec<SuiteWithSummary> = visitor.collect();
+    let test_suites: Vec<SuiteWithSummary> = testsuite_reader.all_suites();
     Ok((test_suites, summary))
 }
 
@@ -243,44 +247,6 @@ pub fn sort_testsuites(suites: &mut Vec<SuiteWithSummary>, sorting: &ReportSorti
         }
     });
 }
-
-// pub enum TestSuitesOutcome {
-//     Success(Summary),
-//     Failure {
-//         summary: Summary,
-//         failed_testsuites: Vec<FailedTestSuite>,
-//     },
-// }
-// impl TestSuitesOutcome {
-//     pub fn new(summary: Summary, suites: Vec<SuiteWithSummary>) -> Self {
-//         if summary.is_successful() {
-//             TestSuitesOutcome::Success(summary)
-//         } else {
-//             let failed_testsuites = suites
-//                 .into_iter()
-//                 .filter_map(|s| s.value.as_failed())
-//                 .map(|s| s.value)
-//                 .collect::<Vec<_>>();
-
-//             TestSuitesOutcome::Failure {
-//                 summary,
-//                 failed_testsuites,
-//             }
-//         }
-//     }
-//     pub fn summary(&self) -> &Summary {
-//         match self {
-//             TestSuitesOutcome::Success(summary) => summary,
-//             TestSuitesOutcome::Failure { summary, .. } => summary,
-//         }
-//     }
-//     pub fn is_successful(&self) -> bool {
-//         match self {
-//             TestSuitesOutcome::Success(_) => true,
-//             _ => false,
-//         }
-//     }
-// }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -581,11 +547,11 @@ com.example
         create_report_dir(base_dir, "testreports", 3, 3, 7).expect("Couldn't setup test data");
         let mut summary = Summary::zero();
 
-        let visitor =
-            TestSuiteVisitor::from_basedir_(base_dir, report_dir_pattern, &mut summary, false)
-                .expect("Couldn't initialize visitor");
+        let reader =
+            TestSuiteReader::from_basedir(base_dir, report_dir_pattern, &mut summary, false)
+                .expect("Couldn't initialise the testsuite reader");
 
-        for test_suite in visitor {
+        for test_suite in reader.all_suites() {
             if let Some(with_summary) = test_suite.value.as_failed() {
                 failed_suites.push(with_summary.value);
             }

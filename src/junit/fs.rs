@@ -1,14 +1,16 @@
-use super::{read_suites, SuiteWithSummary, Summary, SummaryWith};
 use crate::console::ConsoleDisplay;
 use anyhow::Result;
-use atty::Stream;
 use glob::{glob_with, MatchOptions};
-use log::debug;
+use log::{debug, info};
 use std::{
     ffi::OsStr,
     fs, io,
     path::{Path, PathBuf},
+    sync::mpsc::{channel, Sender},
 };
+use threadpool::ThreadPool;
+
+use super::{Summary, SummaryWith, TestSuite};
 
 const SUMMARY_CURSOR_UP: &str = "\x1b[5A";
 const SUMMARY_CURSOR_DOWN: &str = "\x1b[5B";
@@ -41,7 +43,7 @@ impl ReportVisitor {
             }
         }
 
-        debug!("{} report files found", report_files.len());
+        info!("{} report files found", report_files.len());
 
         Ok(ReportVisitor {
             report_files,
@@ -62,40 +64,50 @@ impl Iterator for ReportVisitor {
     }
 }
 
-pub(super) struct TestSuiteVisitor<'s> {
-    summary: &'s mut Summary,
-    current: Vec<SuiteWithSummary>,
+pub(super) struct TestSuiteReader<'s> {
     visitor: ReportVisitor,
-    display_progress: bool,
+    parser_pool: ThreadPool,
+    summary: &'s mut Summary,
     sink: Box<dyn io::Write>,
+    display_progress: bool,
 }
 
-impl<'s> TestSuiteVisitor<'s> {
+impl<'s> TestSuiteReader<'s> {
     pub fn from_basedir<P: AsRef<Path>>(
-        base_dir: P,
-        report_dir_pattern: &str,
-        summary: &'s mut Summary,
-    ) -> Result<Self> {
-        TestSuiteVisitor::from_basedir_(base_dir, report_dir_pattern, summary, true)
-    }
-
-    pub(super) fn from_basedir_<P: AsRef<Path>>(
         base_dir: P,
         report_dir_pattern: &str,
         summary: &'s mut Summary,
         display_progress: bool,
     ) -> Result<Self> {
         let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
-        let display_progress = display_progress && atty::is(Stream::Stdout);
+        //parameterise thread pool size
+        let parser_pool = ThreadPool::new(5);
         let sink = Box::new(io::stdout());
-        let current = vec![];
-        Ok(TestSuiteVisitor {
+
+        Ok(TestSuiteReader {
             visitor,
-            current,
+            parser_pool,
             summary,
-            display_progress,
             sink,
+            display_progress,
         })
+    }
+
+    fn par_parse_suites(&mut self, suite_tx: Sender<Vec<SummaryWith<TestSuite>>>) {
+        for path in &mut self.visitor {
+            let suite_tx = suite_tx.clone();
+            self.parser_pool.execute(move || {
+                let display_path = path.display();
+                debug!("parsing Junit suite: {}", display_path);
+                let file = fs::File::open(display_path.to_string())
+                    .expect(&format!("Couldn't open report file: {}", display_path));
+                let suites = super::read_suites(file).expect(&format!(
+                    "Couldn't parse junit TestSuite from XML report {}",
+                    display_path
+                ));
+                suite_tx.send(suites).unwrap();
+            })
+        }
     }
 
     fn progress_update(&mut self) {
@@ -111,30 +123,28 @@ impl<'s> TestSuiteVisitor<'s> {
             writeln!(&mut self.sink, "{}", SUMMARY_CURSOR_DOWN).unwrap();
         }
     }
-}
-impl<'s> Iterator for TestSuiteVisitor<'s> {
-    type Item = SuiteWithSummary;
-    fn next(&mut self) -> Option<Self::Item> {
-        if !self.current.is_empty() {
-            self.current.pop().map(|SummaryWith { summary, value }| {
-                self.summary += &summary;
+
+    pub fn all_suites(mut self) -> Vec<SummaryWith<TestSuite>> {
+        let mut suites: Vec<SummaryWith<TestSuite>> = Vec::new();
+        let (suite_tx, suite_rx) = channel::<Vec<SummaryWith<TestSuite>>>();
+        self.par_parse_suites(suite_tx);
+        loop {
+            if let Ok(mut parsed_suites) = suite_rx.recv() {
+                debug!(
+                    "Appending {} new suites. Total: {}",
+                    parsed_suites.len(),
+                    suites.len()
+                );
+                for summary_with_suite in &parsed_suites {
+                    self.summary += &summary_with_suite.summary;
+                }
                 self.progress_update();
-                SummaryWith { summary, value }
-            })
-        } else {
-            if let Some(path) = self.visitor.next() {
-                let display_path = path.display();
-                let file = fs::File::open(path.clone())
-                    .expect(&format!("Couldn't open report file: {}", display_path));
-                self.current = read_suites(file).expect(&format!(
-                    "Couldn't parse junit TestSuite from XML report {}",
-                    display_path
-                ));
-                self.next()
+                suites.append(&mut parsed_suites);
             } else {
-                self.end_progress_update();
-                None
+                break;
             }
         }
+        self.end_progress_update();
+        suites
     }
 }
