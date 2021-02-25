@@ -1,12 +1,11 @@
 use crate::{config::Config, github::GithubEvent};
 use anyhow::Result;
 use chrono::Duration;
-use fs::TestSuiteVisitor;
 use serde::{Deserialize, Serialize};
 use serdes::*;
 use std::{env, io, ops::AddAssign, path::PathBuf};
 
-use self::fs::ParTestSuiteVisitor;
+use self::fs::TestSuiteReader;
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct SummaryWith<T>
@@ -225,8 +224,15 @@ pub fn read_testsuites(
 ) -> anyhow::Result<(Vec<SuiteWithSummary>, Summary)> {
     let current_dir = env::current_dir()?;
     let project_dir = project_dir.unwrap_or_else(|| current_dir);
-    let summary = Summary::zero();
-    let visitor = ParTestSuiteVisitor::from_basedir(project_dir, &config.junit.report_dir_pattern)?;
+    let display_progress = true;
+    let mut summary = Summary::zero();
+
+    let mut visitor = TestSuiteReader::from_basedir(
+        project_dir,
+        &config.junit.report_dir_pattern,
+        &mut summary,
+        display_progress,
+    )?;
     // let visitor = TestSuiteVisitor::from_basedir(
     //     project_dir,
     //     &config.junit.report_dir_pattern,
@@ -584,11 +590,11 @@ com.example
         create_report_dir(base_dir, "testreports", 3, 3, 7).expect("Couldn't setup test data");
         let mut summary = Summary::zero();
 
-        let visitor =
-            TestSuiteVisitor::from_basedir_(base_dir, report_dir_pattern, &mut summary, false)
-                .expect("Couldn't initialize visitor");
+        let mut reader =
+            TestSuiteReader::from_basedir(base_dir, report_dir_pattern, &mut summary, false)
+                .expect("Couldn't initialise the testsuite reader");
 
-        for test_suite in visitor {
+        for test_suite in reader.all_suites() {
             if let Some(with_summary) = test_suite.value.as_failed() {
                 failed_suites.push(with_summary.value);
             }
