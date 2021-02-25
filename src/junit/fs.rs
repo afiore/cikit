@@ -1,4 +1,3 @@
-use super::{read_suites, SuiteWithSummary, Summary, SummaryWith};
 use crate::console::ConsoleDisplay;
 use anyhow::Result;
 use atty::Stream;
@@ -8,7 +7,11 @@ use std::{
     ffi::OsStr,
     fs, io,
     path::{Path, PathBuf},
+    sync::mpsc::channel,
 };
+use threadpool::ThreadPool;
+
+use super::{read_suites, SuiteWithSummary, Summary, SummaryWith, TestSuite};
 
 const SUMMARY_CURSOR_UP: &str = "\x1b[5A";
 const SUMMARY_CURSOR_DOWN: &str = "\x1b[5B";
@@ -59,6 +62,56 @@ impl Iterator for ReportVisitor {
             self.position += 1;
             Some(item)
         }
+    }
+}
+
+pub(super) struct ParTestSuiteVisitor {
+    visitor: ReportVisitor,
+    parser_pool: ThreadPool,
+}
+
+impl ParTestSuiteVisitor {
+    pub fn from_basedir<P: AsRef<Path>>(base_dir: P, report_dir_pattern: &str) -> Result<Self> {
+        let visitor = ReportVisitor::from_basedir(base_dir, report_dir_pattern)?;
+        let parser_pool = ThreadPool::new(30);
+        Ok(ParTestSuiteVisitor {
+            visitor,
+            parser_pool,
+        })
+    }
+
+    pub fn all_suites(mut self) -> Vec<SummaryWith<TestSuite>> {
+        let mut suites: Vec<SummaryWith<TestSuite>> = Vec::new();
+        let (suite_tx, suite_rx) = channel::<Vec<SummaryWith<TestSuite>>>();
+        for path in &mut self.visitor {
+            let suite_tx = suite_tx.clone();
+            self.parser_pool.execute(move || {
+                let display_path = path.display();
+                debug!("parsing Junit suite: {}", display_path);
+                let file = fs::File::open(display_path.to_string())
+                    .expect(&format!("Couldn't open report file: {}", display_path));
+                let suites = super::read_suites(file).expect(&format!(
+                    "Couldn't parse junit TestSuite from XML report {}",
+                    display_path
+                ));
+                suite_tx.send(suites).unwrap();
+            })
+        }
+        //TODO: drop implicity
+        drop(suite_tx);
+        loop {
+            if let Ok(mut parsed_suites) = suite_rx.recv() {
+                debug!(
+                    "Appending {} new suites. Total: {}",
+                    parsed_suites.len(),
+                    suites.len()
+                );
+                suites.append(&mut parsed_suites);
+            } else {
+                break;
+            }
+        }
+        suites
     }
 }
 

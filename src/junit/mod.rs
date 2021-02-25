@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use serdes::*;
 use std::{env, io, ops::AddAssign, path::PathBuf};
 
+use self::fs::ParTestSuiteVisitor;
+
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct SummaryWith<T>
 where
@@ -223,13 +225,14 @@ pub fn read_testsuites(
 ) -> anyhow::Result<(Vec<SuiteWithSummary>, Summary)> {
     let current_dir = env::current_dir()?;
     let project_dir = project_dir.unwrap_or_else(|| current_dir);
-    let mut summary = Summary::zero();
-    let visitor = TestSuiteVisitor::from_basedir(
-        project_dir,
-        &config.junit.report_dir_pattern,
-        &mut summary,
-    )?;
-    let test_suites: Vec<SuiteWithSummary> = visitor.collect();
+    let summary = Summary::zero();
+    let visitor = ParTestSuiteVisitor::from_basedir(project_dir, &config.junit.report_dir_pattern)?;
+    // let visitor = TestSuiteVisitor::from_basedir(
+    //     project_dir,
+    //     &config.junit.report_dir_pattern,
+    //     &mut summary,
+    // )?;
+    let test_suites: Vec<SuiteWithSummary> = visitor.all_suites();
     Ok((test_suites, summary))
 }
 
