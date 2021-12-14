@@ -8,9 +8,7 @@ Playground project using Rust to build a minimum viable CI reporting tool.
 - Notify test outcome through various channels: i.e. slack web-hooks, github comments/annotations, email, etc.
 - Have fun!
 
-### Development status
-
-🚧 This is a work in progress and is not feature complete yet!
+### Features
 
 A rudimentary React-based HTML viewer is already implemented:
 
@@ -68,3 +66,8 @@ RUST_LOG='cikit=debug' RUST_BACKTRACE=1 cargo run -- \
 ```
 
 You might want to amend the `report_dir_pattern` config value with a glob expression that matches your project junit XML report dir/s.
+
+### Development status
+
+😴 This project is currently in a dormant state and is not being actively maintained.
+
